@@ -1010,19 +1010,12 @@ async def calendar_today_callback(callback: CallbackQuery):
 
 @router.callback_query(F.data == "calendar_week")
 async def calendar_week_callback(callback: CallbackQuery):
-    """Показать события на неделю"""
-    await callback.message.edit_text(
-        "📆 <b>События на неделю</b>\n\n"
-        "📭 <b>На эту неделю событий не запланировано</b>\n\n"
-        "💡 <b>Что можно сделать:</b>\n"
-        "• Создать событие на неделю\n"
-        "• Запланировать регулярные встречи\n"
-        "• Настроить напоминания\n\n"
-        "🚧 <i>Функция в разработке</i>",
-        reply_markup=keyboards.back_button("category_calendar"),
-        parse_mode="HTML"
-    )
-    await callback.answer()
+    """Показать события на неделю - перенаправление на полную реализацию"""
+    # Импортируем handler из yandex_integration
+    from handlers.yandex_integration import calendar_week_handler
+    
+    # Вызываем полную реализацию
+    await calendar_week_handler(callback)
 
 @router.callback_query(F.data == "calendar_create")
 async def calendar_create_callback(callback: CallbackQuery, state: FSMContext):

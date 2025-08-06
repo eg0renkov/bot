@@ -612,6 +612,184 @@ async def calendar_today_handler(callback: CallbackQuery):
     
     await callback.answer()
 
+@router.callback_query(F.data == "calendar_week")
+async def calendar_week_handler(callback: CallbackQuery):
+    """Показать события на неделю"""
+    user_id = callback.from_user.id
+    
+    # Инициализируем синхронизатор
+    sync = CalendarReminderSync()
+    
+    # Проверяем есть ли токен календаря
+    token_data = await user_tokens.get_token_data(user_id, "calendar")
+    
+    if not token_data or not token_data.get("app_password"):
+        await callback.message.edit_text(
+            f"📆 <b>События на неделю</b>\n\n"
+            "🔐 <b>Календарь не подключен</b>\n\n"
+            "Для просмотра событий необходимо:\n"
+            "1. Подключить Яндекс.Календарь\n"
+            "2. Предоставить разрешения\n\n"
+            "💡 Нажмите кнопку ниже для подключения:",
+            reply_markup=create_connect_keyboard(),
+            parse_mode="HTML"
+        )
+        await callback.answer()
+        return
+    
+    try:
+        # Получаем email пользователя для CalDAV
+        user_email = token_data.get("email")
+        
+        if not user_email:
+            user_info = token_data.get("user_info", {})
+            user_email = user_info.get("default_email", user_info.get("email"))
+        
+        if not user_email:
+            access_token = token_data.get("access_token")
+            if access_token:
+                try:
+                    headers = {"Authorization": f"OAuth {access_token}"}
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get("https://login.yandex.ru/info", headers=headers) as response:
+                            if response.status == 200:
+                                user_data = await response.json()
+                                user_email = user_data.get("default_email")
+                except:
+                    pass
+        
+        if not user_email:
+            await callback.message.edit_text(
+                "❌ <b>Не удалось получить email пользователя</b>\n\n"
+                "Для работы с календарем через CalDAV нужен email.\n"
+                "Попробуйте переподключить календарь.",
+                reply_markup=create_reconnect_keyboard(),
+                parse_mode="HTML"
+            )
+            await callback.answer()
+            return
+        
+        # Создаем клиент календаря
+        app_password = token_data.get("app_password")
+        if app_password:
+            calendar_client = YandexCalendar(app_password, user_email)
+            
+            # Проверяем подключение
+            connection_result = await calendar_client.ensure_connection_async()
+            if not connection_result:
+                await callback.message.edit_text(
+                    "📆 <b>События на неделю</b>\n\n"
+                    "❌ <b>Ошибка подключения к календарю</b>\n\n"
+                    "Возможные причины:\n"
+                    "• Пароль приложения устарел или отозван\n"
+                    "• Проблемы с интернет-соединением\n"
+                    "• Временные проблемы с Яндекс.Календарем\n\n"
+                    "💡 Переподключите календарь:",
+                    reply_markup=create_reconnect_keyboard(),
+                    parse_mode="HTML"
+                )
+                await callback.answer()
+                return
+        else:
+            await callback.message.edit_text(
+                "📆 <b>События на неделю</b>\n\n"
+                "⚠️ <b>Требуется переподключение календаря</b>\n\n"
+                "Для работы с календарем нужен пароль приложения.\n"
+                "OAuth токены не поддерживаются CalDAV.\n\n"
+                "💡 Переподключите календарь с паролем приложения:",
+                reply_markup=create_reconnect_keyboard(),
+                parse_mode="HTML"
+            )
+            await callback.answer()
+            return
+        
+        # Получаем события на неделю (с понедельника по воскресенье)
+        today = datetime.now()
+        # Находим понедельник этой недели
+        days_since_monday = today.weekday()
+        week_start = today - timedelta(days=days_since_monday)
+        week_end = week_start + timedelta(days=6)
+        
+        start_date = week_start.strftime("%Y-%m-%dT00:00:00")
+        end_date = week_end.strftime("%Y-%m-%dT23:59:59")
+        
+        print(f"DEBUG: Запрос событий календаря на неделю для {user_id}, email: {user_email}...")
+        events = await calendar_client.get_events(start_date, end_date)
+        print(f"DEBUG: Получено событий на неделю: {len(events) if events else 0}")
+        
+        if events:
+            # Группируем события по дням
+            events_by_day = {}
+            for event in events:
+                title = event.get("summary", "Без названия")
+                start = event.get("start", {}).get("dateTime", "")
+                if start:
+                    try:
+                        event_time = datetime.fromisoformat(start.replace("Z", "+00:00"))
+                        day_key = event_time.strftime("%Y-%m-%d")
+                        day_name = event_time.strftime("%d.%m (%a)")
+                        time_str = event_time.strftime("%H:%M")
+                        
+                        if day_key not in events_by_day:
+                            events_by_day[day_key] = {
+                                'day_name': day_name,
+                                'events': []
+                            }
+                        
+                        events_by_day[day_key]['events'].append(f"  • {time_str} - {title}")
+                    except:
+                        # Если не удалось распарсить время, добавляем к сегодняшнему дню
+                        today_key = today.strftime("%Y-%m-%d")
+                        if today_key not in events_by_day:
+                            events_by_day[today_key] = {
+                                'day_name': today.strftime("%d.%m (%a)"),
+                                'events': []
+                            }
+                        events_by_day[today_key]['events'].append(f"  • {title}")
+            
+            # Формируем текст с событиями по дням
+            events_text = ""
+            for day_key in sorted(events_by_day.keys()):
+                day_info = events_by_day[day_key]
+                events_text += f"📅 <b>{day_info['day_name']}</b>\n"
+                for event_str in day_info['events'][:3]:  # Максимум 3 события на день
+                    events_text += f"{event_str}\n"
+                if len(day_info['events']) > 3:
+                    events_text += f"  ... и еще {len(day_info['events']) - 3} событий\n"
+                events_text += "\n"
+            
+            week_period = f"{week_start.strftime('%d.%m')} - {week_end.strftime('%d.%m.%Y')}"
+            message_text = f"📆 <b>События на неделю</b>\n<i>{week_period}</i>\n\n{events_text}"
+            
+            total_events = len(events)
+            if total_events > 15:  # Если много событий, показываем общее количество
+                message_text += f"📊 <i>Всего событий на неделю: {total_events}</i>"
+        else:
+            week_period = f"{week_start.strftime('%d.%m')} - {week_end.strftime('%d.%m.%Y')}"
+            message_text = f"📆 <b>События на неделю</b>\n<i>{week_period}</i>\n\n🆓 <i>На эту неделю событий нет</i>"
+        
+        await callback.message.edit_text(
+            message_text,
+            reply_markup=keyboards.back_button("menu_back"),
+            parse_mode="HTML"
+        )
+        
+    except Exception as e:
+        print(f"Ошибка получения событий календаря на неделю: {e}")
+        await callback.message.edit_text(
+            f"📆 <b>События на неделю</b>\n\n"
+            "❌ <b>Ошибка загрузки событий</b>\n\n"
+            "Возможные причины:\n"
+            "• Токен доступа устарел\n"
+            "• Нет доступа к календарю\n"
+            "• Проблемы с сетью\n\n"
+            "💡 Попробуйте переподключить календарь:",
+            reply_markup=create_reconnect_keyboard(),
+            parse_mode="HTML"
+        )
+    
+    await callback.answer()
+
 @router.callback_query(F.data == "calendar_create")
 async def calendar_create_handler(callback: CallbackQuery, state: FSMContext):
     """Создать событие"""
