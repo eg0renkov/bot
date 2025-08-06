@@ -999,7 +999,7 @@ async def calendar_setup_save(callback: CallbackQuery, state: FSMContext):
                 f"• Просматривать расписание\n"
                 f"• Использовать AI для анализа\n\n"
                 f"💡 <b>Попробуйте:</b> \"добавь встречу завтра в 15:00\"",
-                reply_markup=keyboards.main_menu(),
+                reply_markup=keyboards.back_button("menu_back"),
                 parse_mode="HTML"
             )
         else:
@@ -1123,27 +1123,27 @@ async def process_auth_code(message: Message, state: FSMContext):
                     f"👤 <b>Аккаунт:</b> {user_info.get('display_name', 'Неизвестно')}\n"
                     f"📧 <b>Email:</b> {escape_email(user_info.get('default_email', 'Неизвестно'))}\n\n"
                     f"🎉 Теперь вы можете использовать все функции {service_name}!",
-                    reply_markup=keyboards.main_menu(),
+                    reply_markup=keyboards.back_button("menu_back"),
                     parse_mode="HTML"
                 )
             else:
                 await message.answer(
                     "❌ Не удалось получить информацию о пользователе.\n"
                     "Попробуйте подключиться заново.",
-                    reply_markup=keyboards.main_menu()
+                    reply_markup=keyboards.back_button("menu_back")
                 )
         else:
             await message.answer(
                 "❌ Неверный код авторизации.\n"
                 "Попробуйте получить новый код:",
-                reply_markup=keyboards.main_menu()
+                reply_markup=keyboards.back_button("menu_back")
             )
     
     except Exception as e:
         await message.answer(
             f"❌ Ошибка при подключении: {str(e)}\n"
             "Попробуйте позже.",
-            reply_markup=keyboards.main_menu()
+            reply_markup=keyboards.back_button("menu_back")
         )
     
     # Очищаем состояние
@@ -1252,7 +1252,7 @@ async def create_calendar_event(message: Message, state: FSMContext):
                 f"⏰ <b>Время:</b> {event_data.get('start_time', '').replace('T', ' ')}\n"
                 f"📝 <b>Описание:</b> {event_data.get('description', 'Без описания')}",
                 parse_mode="HTML",
-                reply_markup=keyboards.main_menu()
+                reply_markup=keyboards.back_button("menu_back")
             )
         else:
             await message.answer(
