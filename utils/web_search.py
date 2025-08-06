@@ -193,34 +193,45 @@ class WebSearcher:
             logger.error(f"Ошибка поиска новостей: {e}")
             return []
     
-    def _filter_spam_news(self, title: str, snippet: str, source: str) -> bool:
+    def _filter_spam_news(self, title: str, snippet: str, source) -> bool:
         """Фильтровать спам и рекламные новости"""
-        spam_keywords = [
-            'букмекер', 'букмекер', 'ставки', 'промокод', 'фрибет', 'бонус',
-            'казино', 'игровые автоматы', 'слоты', 'покер', 'рулетка',
-            'заработок в интернете', 'быстрые деньги', 'инвестиции с гарантией',
-            'форекс', 'бинарные опционы', 'криптовалюта заработок',
-            'похудение за', 'диета чудо', 'увеличение', 'потенция'
-        ]
-        
-        spam_sources = [
-            'bookmaker-ratings.ru', 'legalbet.ru', 'vseprosport.ru',
-            'stavka.tv', 'metaratings.ru', 'odds.ru'
-        ]
-        
-        text_to_check = f"{title.lower()} {snippet.lower()}"
-        
-        # Проверяем спам-ключевые слова
-        for keyword in spam_keywords:
-            if keyword in text_to_check:
-                return False
-        
-        # Проверяем спам-источники
-        for spam_source in spam_sources:
-            if spam_source.lower() in source.lower():
-                return False
-                
-        return True
+        try:
+            spam_keywords = [
+                'букмекер', 'ставки', 'промокод', 'фрибет', 'бонус',
+                'казино', 'игровые автоматы', 'слоты', 'покер', 'рулетка',
+                'заработок в интернете', 'быстрые деньги', 'инвестиции с гарантией',
+                'форекс', 'бинарные опционы', 'криптовалюта заработок',
+                'похудение за', 'диета чудо', 'увеличение', 'потенция'
+            ]
+            
+            spam_sources = [
+                'bookmaker-ratings.ru', 'legalbet.ru', 'vseprosport.ru',
+                'stavka.tv', 'metaratings.ru', 'odds.ru'
+            ]
+            
+            # Безопасно конвертируем в строки
+            title_str = str(title).lower() if title else ""
+            snippet_str = str(snippet).lower() if snippet else ""
+            source_str = str(source).lower() if source else ""
+            
+            text_to_check = f"{title_str} {snippet_str}"
+            
+            # Проверяем спам-ключевые слова
+            for keyword in spam_keywords:
+                if keyword in text_to_check:
+                    return False
+            
+            # Проверяем спам-источники
+            for spam_source in spam_sources:
+                if spam_source.lower() in source_str:
+                    return False
+                    
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Ошибка фильтрации спама: {e}")
+            # Если ошибка в фильтрации - пропускаем новость
+            return True
     
     def _parse_news_results(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -406,7 +417,11 @@ class WebSearcher:
 
 Сводка должна быть на русском языке, краткой и информативной."""
 
-                    ai_summary = await openai_client.get_response(prompt, system_message="Ты - новостной аналитик. Создавай краткие и точные сводки новостей.")
+                    messages = [
+                        {"role": "system", "content": "Ты - новостной аналитик. Создавай краткие и точные сводки новостей."},
+                        {"role": "user", "content": prompt}
+                    ]
+                    ai_summary = await openai_client.chat_completion(messages)
                     
                     news_summary += f"🤖 **AI-анализ дня:**\n{ai_summary}\n\n"
                     
