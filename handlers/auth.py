@@ -214,3 +214,44 @@ async def auth_stats_command(message: Message):
         (f"\n... и еще {len(stats['authorized_users']) - 10}" if len(stats['authorized_users']) > 10 else ""),
         parse_mode="HTML"
     )
+
+@router.message(Command("reset_auth"))
+async def reset_auth_command(message: Message):
+    """Сброс авторизации для тестирования"""
+    user_id = message.from_user.id
+    
+    # Удаляем пользователя из списка авторизованных
+    if auth_manager.revoke_user_access(user_id):
+        await message.answer(
+            f"🔄 <b>Авторизация сброшена</b>\n\n"
+            f"Теперь вы можете заново пройти авторизацию с помощью /start"
+        )
+    else:
+        await message.answer("❌ Вы не были авторизованы")
+
+@router.message(Command("debug_token"))
+async def debug_token_command(message: Message):
+    """Отладочная команда для проверки токена"""
+    if len(message.text.split()) < 2:
+        await message.answer(
+            "🔍 <b>Отладка токена</b>\n\n"
+            f"Использование: <code>/debug_token ВАШ_ТОКЕН</code>\n\n"
+            f"Эта команда поможет понять, почему токен не проходит проверку.",
+            parse_mode="HTML"
+        )
+        return
+    
+    token = ' '.join(message.text.split()[1:])  # Всё после команды
+    check_result = auth_manager.check_token_format(token)
+    
+    await message.answer(
+        f"🔍 <b>Результат проверки токена</b>\n\n"
+        f"✅ <b>Валидный:</b> {'Да' if check_result['valid'] else 'Нет'}\n"
+        f"💡 <b>Подсказка:</b> {check_result['hint']}\n\n"
+        f"📝 <b>Детали:</b>\n"
+        f"• Длина введенного: {len(token)}\n"
+        f"• Длина ожидаемого: {len(auth_manager.access_token)}\n"
+        f"• Начинается правильно: {token.strip().startswith(auth_manager.access_token[:4])}\n"
+        f"• Правильный токен: <code>SECURE_BOT_ACCESS_2024</code>",
+        parse_mode="HTML"
+    )

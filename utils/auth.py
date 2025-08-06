@@ -50,13 +50,23 @@ class AuthManager:
     
     def authorize_user(self, user_id: int, token: str) -> bool:
         """Авторизовать пользователя по токену"""
-        if token.strip() == self.access_token:
+        # Очищаем токен от всех возможных пробелов и управляющих символов
+        clean_token = ''.join(token.split())
+        clean_expected = ''.join(self.access_token.split())
+        
+        print(f"DEBUG: Сравнение токенов:")
+        print(f"DEBUG: Получен: '{token}' (длина {len(token)})")
+        print(f"DEBUG: Очищен: '{clean_token}' (длина {len(clean_token)})")
+        print(f"DEBUG: Ожидается: '{clean_expected}' (длина {len(clean_expected)})")
+        print(f"DEBUG: Равны: {clean_token == clean_expected}")
+        
+        if clean_token == clean_expected:
             self.authorized_users.add(user_id)
             self._save_authorized_users()
-            print(f"Пользователь {user_id} успешно авторизован")
+            print(f"✅ Пользователь {user_id} успешно авторизован")
             return True
         else:
-            print(f"Неверный токен от пользователя {user_id}: {token[:10]}...")
+            print(f"❌ Неверный токен от пользователя {user_id}: '{clean_token[:10]}...'")
             return False
     
     def revoke_user_access(self, user_id: int) -> bool:
@@ -82,22 +92,28 @@ class AuthManager:
     
     def check_token_format(self, token: str) -> dict:
         """Проверить формат токена и дать подсказки"""
-        token = token.strip()
-        print(f"DEBUG: Проверка токена: '{token}' vs '{self.access_token}' (равны: {token == self.access_token})")
+        # Очищаем токен от всех пробелов и управляющих символов
+        clean_token = ''.join(token.split())
+        clean_expected = ''.join(self.access_token.split())
         
-        if not token:
+        print(f"DEBUG: Проверка токена:")
+        print(f"DEBUG: Исходный: '{token}' (длина {len(token)})")
+        print(f"DEBUG: Очищенный: '{clean_token}' (длина {len(clean_token)})")
+        print(f"DEBUG: Ожидается: '{clean_expected}' (равны: {clean_token == clean_expected})")
+        
+        if not clean_token:
             return {
                 'valid': False,
                 'hint': 'Токен не может быть пустым'
             }
         
-        if len(token) < 10:
+        if len(clean_token) < 10:
             return {
                 'valid': False,
-                'hint': f'Токен слишком короткий (получено {len(token)} символов, ожидается больше)'
+                'hint': f'Токен слишком короткий (получено {len(clean_token)} символов, ожидается больше)'
             }
         
-        if token == self.access_token:
+        if clean_token == clean_expected:
             return {
                 'valid': True,
                 'hint': 'Токен корректен'
@@ -106,13 +122,13 @@ class AuthManager:
         # Анализируем ошибки
         hints = []
         
-        if not token.startswith(self.access_token[:4]):
-            hints.append('Токен начинается неправильно')
+        if not clean_token.startswith(clean_expected[:4]):
+            hints.append(f'Токен начинается неправильно (получено: {clean_token[:4]}, ожидается: {clean_expected[:4]})')
         
-        if len(token) != len(self.access_token):
-            hints.append(f'Неправильная длина токена (получено {len(token)}, ожидается {len(self.access_token)})')
+        if len(clean_token) != len(clean_expected):
+            hints.append(f'Неправильная длина токена (получено {len(clean_token)}, ожидается {len(clean_expected)})')
         
-        if token.lower() == self.access_token.lower():
+        if clean_token.lower() == clean_expected.lower():
             hints.append('Проверьте регистр символов')
         
         return {
