@@ -721,6 +721,24 @@ async def extract_web_search_query(text: str) -> dict:
     
     return None
 
+def truncate_message(text: str, max_length: int = 3800) -> str:
+    """Безопасно обрезать сообщение для Telegram"""
+    if len(text) <= max_length:
+        return text
+    
+    # Ищем последний полный результат перед лимитом
+    lines = text.split('\n')
+    result = ""
+    
+    for line in lines:
+        if len(result + line + '\n') > max_length - 150:  # Оставляем место для сообщения об обрезке
+            break
+        result += line + '\n'
+    
+    result += "\n📝 _Результаты сокращены из-за ограничений Telegram (макс. 4096 символов)_\n\n💡 _Используйте более конкретные запросы для получения точных результатов_"
+    
+    return result
+
 async def handle_web_search_command(message: Message, web_search_info: dict):
     """Обработать команду веб-поиска"""
     try:
@@ -761,6 +779,9 @@ async def handle_web_search_command(message: Message, web_search_info: dict):
             else:
                 # Обычный поиск
                 result = await web_searcher.quick_search(query)
+            
+            # Обрезаем результат если он слишком длинный
+            result = truncate_message(result)
             
             # Создаем клавиатуру с дополнительными действиями
             keyboard = keyboards.search_results_menu()

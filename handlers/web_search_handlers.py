@@ -9,6 +9,24 @@ from aiogram.fsm.state import State, StatesGroup
 from utils.keyboards import BotKeyboards
 from utils.web_search import web_searcher
 
+def truncate_message(text: str, max_length: int = 3800) -> str:
+    """Безопасно обрезать сообщение для Telegram"""
+    if len(text) <= max_length:
+        return text
+    
+    # Ищем последний полный результат перед лимитом
+    lines = text.split('\n')
+    result = ""
+    
+    for line in lines:
+        if len(result + line + '\n') > max_length - 150:  # Оставляем место для сообщения об обрезке
+            break
+        result += line + '\n'
+    
+    result += "\n📝 _Результаты сокращены из-за ограничений Telegram (макс. 4096 символов)_\n\n💡 _Используйте более конкретные запросы для получения точных результатов_"
+    
+    return result
+
 router = Router()
 logger = logging.getLogger(__name__)
 
@@ -124,6 +142,9 @@ async def process_search_query(message: Message, state: FSMContext):
                 # Обычный поиск
                 result = await web_searcher.quick_search(query)
             
+            # Обрезаем результат если он слишком длинный
+            result = truncate_message(result)
+            
             # Создаем клавиатуру с дополнительными действиями
             keyboard = keyboards.search_results_menu()
             
@@ -188,6 +209,9 @@ async def process_news_query(message: Message, state: FSMContext):
                             result += f"   🔗 [Читать полностью]({link})\n"
                         result += "\n"
             
+            # Обрезаем результат если он слишком длинный
+            result = truncate_message(result)
+            
             # Создаем клавиатуру
             keyboard = keyboards.search_results_menu()
             
@@ -242,6 +266,7 @@ async def quick_search_command(message: Message):
         
         try:
             result = await web_searcher.quick_search(query)
+            result = truncate_message(result)
             keyboard = keyboards.search_results_menu()
             
             await search_msg.edit_text(
@@ -279,6 +304,7 @@ async def quick_news_command(message: Message):
                 news_results = await web_searcher.search_news(query, num_results=3)
                 result = web_searcher.format_search_results(news_results, max_results=3)
             
+            result = truncate_message(result)
             keyboard = keyboards.search_results_menu()
             
             await search_msg.edit_text(

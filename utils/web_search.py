@@ -213,7 +213,7 @@ class WebSearcher:
         
         return results
     
-    def format_search_results(self, results: List[Dict[str, Any]], max_results: int = 5) -> str:
+    def format_search_results(self, results: List[Dict[str, Any]], max_results: int = 5, max_length: int = 3500) -> str:
         """
         Форматировать результаты поиска для отображения
         
@@ -258,6 +258,10 @@ class WebSearcher:
         total_count = len(results)
         if total_count > max_results:
             formatted_text += f"_Показано {max_results} из {total_count} результатов_\n"
+        
+        # Обрезаем сообщение если оно слишком длинное
+        if len(formatted_text) > max_length:
+            formatted_text = formatted_text[:max_length-100] + "\n\n...\n\n📝 _Результаты сокращены из-за ограничений Telegram_"
         
         return formatted_text
     
