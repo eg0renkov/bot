@@ -1,6 +1,7 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from utils.keyboards import keyboards
 from database.vector_memory import vector_memory
 from config.settings import settings
@@ -990,39 +991,22 @@ async def search_reset_settings_callback(callback: CallbackQuery):
 
 # Обработчики календаря
 @router.callback_query(F.data == "calendar_connect")
-async def calendar_connect_callback(callback: CallbackQuery):
-    """Подключение календаря"""
-    await callback.message.edit_text(
-        "📅 <b>Подключение календаря</b>\n\n"
-        "🚀 <b>После подключения вы сможете:</b>\n"
-        "• 📝 Создавать события голосом и текстом\n"
-        "• ⏰ Получать умные напоминания\n"
-        "• 📊 Анализировать расписание с помощью AI\n"
-        "• 🤝 Планировать встречи автоматически\n\n"
-        "⚡ <b>Настройка займет 3 минуты</b>\n\n"
-        "🔒 <b>Безопасность:</b> Используем пароли приложений Яндекс\n\n"
-        "🚧 <b>Функция в разработке</b>\n"
-        "Скоро будет доступна полная интеграция с Яндекс.Календарь",
-        reply_markup=keyboards.back_button("category_calendar"),
-        parse_mode="HTML"
-    )
-    await callback.answer()
+async def calendar_connect_callback(callback: CallbackQuery, state: FSMContext):
+    """Подключение календаря - перенаправление на полную реализацию"""
+    # Импортируем handler из yandex_integration
+    from handlers.yandex_integration import connect_calendar_handler
+    
+    # Вызываем полную реализацию подключения календаря
+    await connect_calendar_handler(callback, state)
 
 @router.callback_query(F.data == "calendar_today")
 async def calendar_today_callback(callback: CallbackQuery):
-    """Показать события на сегодня"""
-    await callback.message.edit_text(
-        "📅 <b>События на сегодня</b>\n\n"
-        "📭 <b>На сегодня событий не запланировано</b>\n\n"
-        "💡 <b>Что можно сделать:</b>\n"
-        "• Создать новое событие\n"
-        "• Проверить события на неделю\n"
-        "• Подключить календарь для синхронизации\n\n"
-        "🚧 <i>Функция в разработке</i>",
-        reply_markup=keyboards.back_button("category_calendar"),
-        parse_mode="HTML"
-    )
-    await callback.answer()
+    """Показать события на сегодня - перенаправление на полную реализацию"""
+    # Импортируем handler из yandex_integration
+    from handlers.yandex_integration import calendar_today_handler
+    
+    # Вызываем полную реализацию
+    await calendar_today_handler(callback)
 
 @router.callback_query(F.data == "calendar_week")
 async def calendar_week_callback(callback: CallbackQuery):
@@ -1041,26 +1025,13 @@ async def calendar_week_callback(callback: CallbackQuery):
     await callback.answer()
 
 @router.callback_query(F.data == "calendar_create")
-async def calendar_create_callback(callback: CallbackQuery):
-    """Создание события"""
-    await callback.message.edit_text(
-        "➕ <b>Создать событие</b>\n\n"
-        "📝 <b>Как создать событие:</b>\n"
-        "Закройте меню и напишите что хотите запланировать\n\n"
-        "🎯 <b>Примеры команд:</b>\n"
-        "• \"Запланируй встречу завтра в 15:00\"\n"
-        "• \"Создай событие на понедельник в 10:00\"\n"
-        "• \"Добавь в календарь: звонок клиенту в 14:30\"\n"
-        "• \"Напомни мне про совещание в пятницу\"\n\n"
-        "🤖 <b>AI поможет:</b>\n"
-        "• Определить дату и время\n"
-        "• Создать описание события\n"
-        "• Настроить напоминания\n\n"
-        "🚧 <i>Полная интеграция с календарем в разработке</i>",
-        reply_markup=keyboards.back_button("category_calendar"),
-        parse_mode="HTML"
-    )
-    await callback.answer()
+async def calendar_create_callback(callback: CallbackQuery, state: FSMContext):
+    """Создание события - перенаправление на полную реализацию"""
+    # Импортируем handler из yandex_integration
+    from handlers.yandex_integration import calendar_create_handler
+    
+    # Вызываем полную реализацию
+    await calendar_create_handler(callback, state)
 
 @router.callback_query(F.data == "calendar_sync_reminders")
 async def calendar_sync_reminders_callback(callback: CallbackQuery):
