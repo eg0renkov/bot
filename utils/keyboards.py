@@ -36,14 +36,18 @@ class BotKeyboards:
         )
         
         builder.add(
-            InlineKeyboardButton(text="⚙️ Настройки", callback_data="category_settings"),
+            InlineKeyboardButton(text="🌐 Веб-поиск", callback_data="web_search"),
+            InlineKeyboardButton(text="⚙️ Настройки", callback_data="category_settings")
+        )
+        
+        builder.add(
             InlineKeyboardButton(text="❓ Помощь", callback_data="help_menu")
         )
         
         # Закрыть меню
         builder.add(InlineKeyboardButton(text="❌ Закрыть меню", callback_data="close_menu"))
         
-        builder.adjust(2, 2, 2, 2, 1)
+        builder.adjust(2, 2, 2, 2, 1, 1)
         return builder.as_markup()
     
     @staticmethod
@@ -384,6 +388,51 @@ class BotKeyboards:
         )
         
         builder.adjust(1, 1, 1)
+        return builder.as_markup()
+    
+    @staticmethod
+    def web_search_menu() -> InlineKeyboardMarkup:
+        """Меню веб-поиска"""
+        builder = InlineKeyboardBuilder()
+        
+        builder.add(
+            InlineKeyboardButton(text="🔍 Обычный поиск", callback_data="web_search_general"),
+            InlineKeyboardButton(text="📰 Поиск новостей", callback_data="web_search_news")
+        )
+        
+        builder.add(
+            InlineKeyboardButton(text="💡 Умный поиск", callback_data="web_search_smart")
+        )
+        
+        builder.add(
+            InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu_back")
+        )
+        
+        builder.adjust(2, 1, 1)
+        return builder.as_markup()
+    
+    @staticmethod
+    def search_results_menu() -> InlineKeyboardMarkup:
+        """Меню для результатов поиска"""
+        builder = InlineKeyboardBuilder()
+        
+        builder.add(
+            InlineKeyboardButton(text="🔍 Новый поиск", callback_data="search_new_query"),
+            InlineKeyboardButton(text="🏠 В меню", callback_data="search_to_menu")
+        )
+        
+        builder.adjust(2)
+        return builder.as_markup()
+    
+    @staticmethod
+    def create_cancel_button(back_callback: str = "menu_back") -> InlineKeyboardMarkup:
+        """Кнопка отмены для веб-поиска"""
+        builder = InlineKeyboardBuilder()
+        
+        builder.add(
+            InlineKeyboardButton(text="❌ Отмена", callback_data=back_callback)
+        )
+        
         return builder.as_markup()
 
 class ReminderKeyboards:

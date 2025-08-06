@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from config.settings import settings
-from handlers import messages, vector_commands, menu_handlers, menu_handlers_ai, yandex_integration, quick_actions, drafts_handlers, email_setup, contacts, fallback_handlers, reminders, auth
+from handlers import messages, vector_commands, menu_handlers, menu_handlers_ai, yandex_integration, quick_actions, drafts_handlers, email_setup, contacts, fallback_handlers, reminders, auth, web_search_handlers
 from utils.reminder_scheduler import ReminderScheduler
 from middleware.auth_middleware import AuthMiddleware
 
@@ -50,6 +50,7 @@ async def main():
         dp.include_router(yandex_integration.router)
         dp.include_router(drafts_handlers.router)
         dp.include_router(vector_commands.router)
+        dp.include_router(web_search_handlers.router)  # Веб-поиск
         dp.include_router(quick_actions.router)
         dp.include_router(messages.router)
         dp.include_router(fallback_handlers.router)  # Последним!

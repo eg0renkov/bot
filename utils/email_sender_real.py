@@ -1,5 +1,6 @@
 import smtplib
 import ssl
+import socket
 import imaplib
 import email
 from email.mime.text import MIMEText
@@ -61,11 +62,25 @@ class RealEmailSender:
     
     def _test_smtp(self, email: str, password: str) -> Dict:
         """Тестировать SMTP подключение"""
+        server = None
         try:
-            # Увеличиваем timeout для стабильности
-            server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30)
-            server.starttls()
+            print(f"DEBUG: Тестируем SMTP для {email}")
+            print(f"DEBUG: Подключаемся к {self.smtp_server}:{self.smtp_port}")
+            
+            # Создаем подключение с явным указанием параметров для Yandex
+            server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=45)
+            server.set_debuglevel(0)  # Отключаем debug для production
+            
+            print("DEBUG: Устанавливаем STARTTLS...")
+            # Включаем TLS с принудительной проверкой сертификата
+            context = ssl.create_default_context()
+            server.starttls(context=context)
+            
+            print("DEBUG: Пытаемся авторизоваться...")
+            # Авторизация
             server.login(email, password)
+            
+            print("DEBUG: SMTP подключение успешно!")
             server.quit()
             
             return {
@@ -73,24 +88,77 @@ class RealEmailSender:
                 'message': 'SMTP подключение успешно'
             }
             
-        except smtplib.SMTPAuthenticationError:
+        except smtplib.SMTPAuthenticationError as e:
+            error_msg = f"Неверный email или пароль приложения: {str(e)}"
+            print(f"DEBUG: SMTP Auth Error: {error_msg}")
             return {
                 'success': False,
-                'error': 'Неверный email или пароль приложения',
+                'error': error_msg,
                 'message': 'Ошибка аутентификации'
             }
-        except smtplib.SMTPException as e:
+        except smtplib.SMTPConnectError as e:
+            error_msg = f"Не удалось подключиться к серверу: {str(e)}"
+            print(f"DEBUG: SMTP Connect Error: {error_msg}")
             return {
                 'success': False,
-                'error': f'SMTP ошибка: {str(e)}',
+                'error': error_msg,
+                'message': 'Ошибка подключения к серверу'
+            }
+        except smtplib.SMTPServerDisconnected as e:
+            error_msg = f"Сервер разорвал соединение: {str(e)}"
+            print(f"DEBUG: SMTP Disconnect Error: {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'message': 'Соединение разорвано'
+            }
+        except smtplib.SMTPException as e:
+            error_msg = f'SMTP ошибка: {str(e)}'
+            print(f"DEBUG: SMTP Exception: {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
                 'message': 'Ошибка SMTP сервера'
             }
-        except Exception as e:
+        except socket.timeout:
+            error_msg = 'Таймаут подключения к SMTP серверу'
+            print(f"DEBUG: SMTP Timeout: {error_msg}")
             return {
                 'success': False,
-                'error': f'Ошибка подключения: {str(e)}',
+                'error': error_msg,
+                'message': 'Таймаут подключения'
+            }
+        except socket.gaierror as e:
+            error_msg = f'Ошибка DNS: {str(e)}'
+            print(f"DEBUG: DNS Error: {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'message': 'Проблема с DNS'
+            }
+        except ConnectionRefusedError:
+            error_msg = 'Подключение отклонено (порт заблокирован)'
+            print(f"DEBUG: Connection Refused: {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'message': 'Порт заблокирован провайдером'
+            }
+        except Exception as e:
+            error_msg = f'Неизвестная ошибка: {str(e)}'
+            print(f"DEBUG: Unknown Error: {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
                 'message': 'Техническая ошибка'
             }
+        finally:
+            # Закрываем соединение в любом случае
+            try:
+                if server:
+                    server.quit()
+            except:
+                pass
     
     def _test_imap(self, email: str, password: str) -> Dict:
         """Тестировать IMAP подключение"""
