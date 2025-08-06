@@ -754,28 +754,33 @@ async def handle_web_search_command(message: Message, web_search_info: dict):
         # Выполняем поиск
         try:
             if search_type == 'news':
-                async with web_searcher:
-                    news_results = await web_searcher.search_news(query, num_results=5)
-                    
-                    if not news_results:
-                        result = f"📰 По запросу '{query}' новостей не найдено."
-                    else:
-                        result = f"📰 **Новости по запросу:** {query}\n\n"
+                # Для общих запросов новостей используем сводку
+                if query.strip() in ['последние новости', 'актуальные новости', '', 'сегодня', 'на сегодня']:
+                    result = await web_searcher.get_daily_news_summary()
+                else:
+                    # Для конкретных запросов используем обычный поиск новостей
+                    async with web_searcher:
+                        news_results = await web_searcher.search_news(query, num_results=8)
                         
-                        for i, news in enumerate(news_results, 1):
-                            title = news.get('title', 'Без названия')[:80]
-                            source = news.get('source', 'Неизвестный источник')
-                            date = news.get('date', '')
-                            snippet = news.get('snippet', '')[:150]
-                            link = news.get('link', '')
+                        if not news_results:
+                            result = f"📰 По запросу '{query}' новостей не найдено."
+                        else:
+                            result = f"📰 **Новости по запросу:** {query}\n\n"
                             
-                            result += f"📰 **{i}. {title}**\n"
-                            result += f"   📅 {date} | 📡 {source}\n"
-                            if snippet:
-                                result += f"   {snippet}...\n"
-                            if link:
-                                result += f"   🔗 [Читать полностью]({link})\n"
-                            result += "\n"
+                            for i, news in enumerate(news_results[:5], 1):  # Показываем только 5 лучших
+                                title = news.get('title', 'Без названия')[:80]
+                                source = news.get('source', 'Неизвестный источник')
+                                date = news.get('date', '')
+                                snippet = news.get('snippet', '')[:100]
+                                
+                                result += f"📰 **{i}. {title}**\n"
+                                result += f"   📡 {source}"
+                                if date:
+                                    result += f" | 📅 {date}"
+                                result += "\n"
+                                if snippet:
+                                    result += f"   {snippet}...\n"
+                                result += "\n"
             else:
                 # Обычный поиск
                 result = await web_searcher.quick_search(query)

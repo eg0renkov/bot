@@ -143,8 +143,9 @@ class WebSearcher:
     async def search_news(
         self,
         query: str,
-        num_results: int = 5,
-        language: str = "ru"
+        num_results: int = 10,
+        language: str = "ru",
+        country: str = "ru"
     ) -> List[Dict[str, Any]]:
         """
         Поиск новостей
@@ -162,13 +163,19 @@ class WebSearcher:
             return []
         
         try:
+            # Улучшаем запрос для получения качественных новостей
+            if not query or query.strip() in ['последние новости', 'актуальные новости', '']:
+                query = 'новости России сегодня'
+            
             params = {
                 'q': query,
                 'api_key': self.api_key,
                 'engine': 'google_news',
                 'num': num_results,
                 'hl': language,
-                'gl': 'ru'
+                'gl': country,
+                'tbm': 'nws',  # Только новости
+                'tbs': 'qdr:d'  # Только за последний день
             }
             
             if not self.session:
@@ -186,6 +193,35 @@ class WebSearcher:
             logger.error(f"Ошибка поиска новостей: {e}")
             return []
     
+    def _filter_spam_news(self, title: str, snippet: str, source: str) -> bool:
+        """Фильтровать спам и рекламные новости"""
+        spam_keywords = [
+            'букмекер', 'букмекер', 'ставки', 'промокод', 'фрибет', 'бонус',
+            'казино', 'игровые автоматы', 'слоты', 'покер', 'рулетка',
+            'заработок в интернете', 'быстрые деньги', 'инвестиции с гарантией',
+            'форекс', 'бинарные опционы', 'криптовалюта заработок',
+            'похудение за', 'диета чудо', 'увеличение', 'потенция'
+        ]
+        
+        spam_sources = [
+            'bookmaker-ratings.ru', 'legalbet.ru', 'vseprosport.ru',
+            'stavka.tv', 'metaratings.ru', 'odds.ru'
+        ]
+        
+        text_to_check = f"{title.lower()} {snippet.lower()}"
+        
+        # Проверяем спам-ключевые слова
+        for keyword in spam_keywords:
+            if keyword in text_to_check:
+                return False
+        
+        # Проверяем спам-источники
+        for spam_source in spam_sources:
+            if spam_source.lower() in source.lower():
+                return False
+                
+        return True
+    
     def _parse_news_results(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Парсить результаты поиска новостей
@@ -200,11 +236,19 @@ class WebSearcher:
         
         news_results = data.get('news_results', [])
         for result in news_results:
+            title = result.get('title', '')
+            snippet = result.get('snippet', '')
+            source = result.get('source', '')
+            
+            # Фильтруем спам
+            if not self._filter_spam_news(title, snippet, source):
+                continue
+                
             parsed_result = {
-                'title': result.get('title', ''),
+                'title': title,
                 'link': result.get('link', ''),
-                'snippet': result.get('snippet', ''),
-                'source': result.get('source', ''),
+                'snippet': snippet,
+                'source': source,
                 'date': result.get('date', ''),
                 'thumbnail': result.get('thumbnail', ''),
                 'position': result.get('position', 0)
@@ -314,6 +358,68 @@ class WebSearcher:
                 summary += f"\n**{i}. {title}**\n{snippet}...\n"
             
             return summary
+    
+    async def get_daily_news_summary(self, query: str = "новости России сегодня") -> str:
+        """
+        Получить краткую сводку новостей за день с AI-анализом
+        
+        Args:
+            query: Поисковый запрос для новостей
+            
+        Returns:
+            Краткая сводка новостей
+        """
+        try:
+            async with self:
+                # Получаем больше новостей для лучшего анализа
+                news_results = await self.search_news(query, num_results=15)
+                
+                if not news_results:
+                    return "📰 К сожалению, актуальных новостей за сегодня не найдено."
+                
+                # Берем только топ-5 качественных новостей
+                top_news = news_results[:5]
+                
+                # Собираем краткую информацию о новостях
+                news_summary = "📰 **Сводка новостей на сегодня:**\n\n"
+                
+                for i, news in enumerate(top_news, 1):
+                    title = news.get('title', 'Без названия')[:100]
+                    source = news.get('source', 'Источник не указан')
+                    date = news.get('date', '')
+                    
+                    news_summary += f"**{i}. {title}**\n"
+                    if source:
+                        news_summary += f"   📡 {source}"
+                    if date:
+                        news_summary += f" | 📅 {date}"
+                    news_summary += "\n\n"
+                
+                # Если AI доступен, добавляем краткий анализ
+                try:
+                    from utils.openai_client import openai_client
+                    
+                    # Создаем промпт для анализа новостей
+                    prompt = f"""Проанализируй следующие новости и создай краткую сводку (2-3 предложения) основных событий дня:
+
+{chr(10).join([f"- {news.get('title', '')}: {news.get('snippet', '')[:100]}" for news in top_news])}
+
+Сводка должна быть на русском языке, краткой и информативной."""
+
+                    ai_summary = await openai_client.get_response(prompt, system_message="Ты - новостной аналитик. Создавай краткие и точные сводки новостей.")
+                    
+                    news_summary += f"🤖 **AI-анализ дня:**\n{ai_summary}\n\n"
+                    
+                except Exception as ai_error:
+                    logger.warning(f"AI-анализ недоступен: {ai_error}")
+                
+                news_summary += f"📊 _Показано {len(top_news)} из {len(news_results)} новостей_"
+                
+                return news_summary
+                
+        except Exception as e:
+            logger.error(f"Ошибка получения сводки новостей: {e}")
+            return "❌ Ошибка получения сводки новостей. Попробуйте позже."
 
 # Создаем глобальный экземпляр
 web_searcher = WebSearcher()
