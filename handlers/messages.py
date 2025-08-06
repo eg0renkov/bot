@@ -13,6 +13,7 @@ from utils.keyboards import keyboards
 from utils.email_sender import email_sender
 from utils.temp_emails import temp_emails
 from utils.email_improver import email_improver
+from utils.web_search import web_searcher
 import re
 
 router = Router()
@@ -663,6 +664,125 @@ async def extract_search_query(text: str) -> str:
     
     return None
 
+async def extract_web_search_query(text: str) -> dict:
+    """Определить, является ли запрос веб-поиском и его тип"""
+    text_lower = text.lower().strip()
+    
+    # Ключевые слова для новостей
+    news_keywords = [
+        'новости', 'актуальные новости', 'свежие новости', 'последние новости',
+        'что происходит', 'события сегодня', 'новости сегодня', 'новости на сегодня',
+        'что нового', 'актуальная информация', 'сводка новостей', 'новостная сводка'
+    ]
+    
+    # Ключевые слова для обычного поиска
+    search_keywords = [
+        'найди информацию', 'поищи информацию', 'найди в интернете', 'поиск в интернете',
+        'что такое', 'расскажи о', 'информация о', 'найди данные о', 'поищи данные о',
+        'актуальная информация о', 'последняя информация о'
+    ]
+    
+    # Проверяем на новости
+    for keyword in news_keywords:
+        if keyword in text_lower:
+            # Убираем ключевое слово и возвращаем остальное как запрос
+            query = text_lower.replace(keyword, '').strip()
+            if not query:
+                query = 'последние новости'
+            return {'type': 'news', 'query': query}
+    
+    # Проверяем на обычный поиск
+    for keyword in search_keywords:
+        if keyword in text_lower:
+            query = text_lower.replace(keyword, '').strip()
+            if query:
+                return {'type': 'search', 'query': query}
+    
+    # Проверяем вопросительные конструкции, которые могут быть поиском
+    question_patterns = [
+        r'что такое (.+)\?',
+        r'кто такой (.+)\?', 
+        r'где находится (.+)\?',
+        r'как работает (.+)\?',
+        r'сколько стоит (.+)\?',
+        r'когда происходит (.+)\?',
+        r'(.+) это что\?',
+        r'актуальные (.+)\?'
+    ]
+    
+    for pattern in question_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            query = match.group(1).strip()
+            # Если упоминаются новости - это поиск новостей
+            if 'новост' in query:
+                return {'type': 'news', 'query': query}
+            return {'type': 'search', 'query': query}
+    
+    return None
+
+async def handle_web_search_command(message: Message, web_search_info: dict):
+    """Обработать команду веб-поиска"""
+    try:
+        search_type = web_search_info['type']
+        query = web_search_info['query']
+        
+        # Показываем статус поиска
+        if search_type == 'news':
+            status_msg = await message.answer(f"📰 Ищу новости: {query}\n\n⏳ Подождите...")
+        else:
+            status_msg = await message.answer(f"🔍 Выполняю поиск: {query}\n\n⏳ Подождите...")
+        
+        # Выполняем поиск
+        try:
+            if search_type == 'news':
+                async with web_searcher:
+                    news_results = await web_searcher.search_news(query, num_results=5)
+                    
+                    if not news_results:
+                        result = f"📰 По запросу '{query}' новостей не найдено."
+                    else:
+                        result = f"📰 **Новости по запросу:** {query}\n\n"
+                        
+                        for i, news in enumerate(news_results, 1):
+                            title = news.get('title', 'Без названия')[:80]
+                            source = news.get('source', 'Неизвестный источник')
+                            date = news.get('date', '')
+                            snippet = news.get('snippet', '')[:150]
+                            link = news.get('link', '')
+                            
+                            result += f"📰 **{i}. {title}**\n"
+                            result += f"   📅 {date} | 📡 {source}\n"
+                            if snippet:
+                                result += f"   {snippet}...\n"
+                            if link:
+                                result += f"   🔗 [Читать полностью]({link})\n"
+                            result += "\n"
+            else:
+                # Обычный поиск
+                result = await web_searcher.quick_search(query)
+            
+            # Создаем клавиатуру с дополнительными действиями
+            keyboard = keyboards.search_results_menu()
+            
+            await status_msg.edit_text(
+                text=result,
+                reply_markup=keyboard,
+                parse_mode="Markdown",
+                disable_web_page_preview=True
+            )
+            
+        except Exception as search_error:
+            print(f"ERROR: Web search failed: {search_error}")
+            await status_msg.edit_text(
+                text=f"❌ Ошибка поиска: {search_error}",
+                reply_markup=keyboards.back_button("menu_back")
+            )
+    
+    except Exception as e:
+        print(f"ERROR: handle_web_search_command: {e}")
+        await message.answer("❌ Ошибка обработки веб-поиска")
+
 @router.message(F.text)
 async def handle_text_message(message: Message):
     """Обработчик текстовых сообщений"""
@@ -692,6 +812,9 @@ async def handle_text_message(message: Message):
         # Проверяем, является ли это командой поиска писем
         search_query = await extract_search_query(user_message)
         
+        # Проверяем, является ли это веб-поисковым запросом
+        web_search_info = await extract_web_search_query(user_message)
+        
         if calendar_command:
             # Обрабатываем команду создания события календаря
             return await handle_calendar_command(message, calendar_command, user_id)
@@ -699,6 +822,10 @@ async def handle_text_message(message: Message):
         if edit_command:
             # Используем общую функцию обработки редактирования
             return await handle_email_edit_command(message, edit_command, user_id)
+        
+        if web_search_info:
+            # Обрабатываем веб-поиск
+            return await handle_web_search_command(message, web_search_info)
         
         if search_query:
             # Проверяем, подключена ли почта
