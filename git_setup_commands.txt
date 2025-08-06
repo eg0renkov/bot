@@ -1,0 +1,24 @@
+# Команды для настройки Git и загрузки на GitHub
+
+# 1. Инициализация Git (в папке с ботом)
+git init
+
+# 2. Добавление файлов
+git add .
+
+# 3. Первый коммит
+git commit -m "Initial bot deployment"
+
+# 4. Добавление remote репозитория (замените YOUR_USERNAME)
+git remote add origin https://github.com/YOUR_USERNAME/telegram-ai-bot.git
+
+# 5. Отправка на GitHub
+git branch -M main
+git push -u origin main
+
+# 6. На сервере клонируем репозиторий
+ssh username@YOUR_SERVER_IP
+git clone https://github.com/YOUR_USERNAME/telegram-ai-bot.git
+cd telegram-ai-bot
+chmod +x deploy.sh
+./deploy.sh
