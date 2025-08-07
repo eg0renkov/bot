@@ -244,11 +244,21 @@ async def extract_email_info(text: str, user_name: str = None) -> dict:
 
 async def extract_calendar_command(text: str) -> dict:
     """Извлечь команду создания события календаря"""
+    text_lower = text.lower()
+    
+    # Проверяем что это НЕ email команда (содержит @ символ)
+    if '@' in text:
+        return None
+    
+    # ВАЖНО: Проверяем что это НЕ команда контакта
+    contact_exclusions = ['контакт', 'номер', 'телефон', '+7', '+3', '+8', '+9']
+    if any(exclusion in text_lower for exclusion in contact_exclusions):
+        return None
+    
     calendar_patterns = [
-        # Паттерны с "добавь" и временем
+        # Паттерны с "добавь" и временем (более специфичные)
         r"добав[ьи].*(?:что\s+)?(?:сегодня|завтра|в\s+\w+)\s+(?:в\s+)?(\d{1,2}:?\d{0,2}?)\s*(.+)",
         r"добав[ьи].*(?:что\s+)?(.+)\s+(?:сегодня|завтра|в\s+\w+)\s+(?:в\s+)?(\d{1,2}:?\d{0,2}?)",
-        r"добав[ьи].*(?:что\s+)?(.+)",
         
         # Паттерны со "встреча"
         r"встреча\s+(.+)",
@@ -260,18 +270,21 @@ async def extract_calendar_command(text: str) -> dict:
         # Общие паттерны создания событий
         r"создай\s+событие\s+(.+)",
         r"запланируй\s+(.+)",
-        r"напомни\s+(.+)"
+        r"напомни\s+(.+)",
+        
+        # УБРАЛИ общий паттерн r"добав[ьи].*(?:что\s+)?(.+)" который ловил все команды "добавь"
+        # Теперь "добавь" работает только с конкретными временными указаниями выше
     ]
     
-    text_lower = text.lower()
+    # Проверяем календарные ключевые слова (но исключаем "добавь" как единственный признак)
+    calendar_keywords = ['встреча', 'событие', 'запланируй', 'напомни', 'сегодня', 'завтра']
+    has_calendar_keywords = any(word in text_lower for word in calendar_keywords)
     
-    # Проверяем что это НЕ email команда (содержит @ символ)
-    if '@' in text:
+    # Для команд с "добавь" требуем дополнительные календарные признаки
+    if 'добавь' in text_lower and not has_calendar_keywords:
         return None
     
-    # Проверяем календарные ключевые слова
-    calendar_keywords = ['добавь', 'встреча', 'событие', 'запланируй', 'напомни', 'сегодня', 'завтра']
-    if not any(word in text_lower for word in calendar_keywords):
+    if not has_calendar_keywords and 'добавь' not in text_lower:
         return None
     
     for pattern in calendar_patterns:
