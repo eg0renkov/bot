@@ -579,6 +579,14 @@ async def extract_email_edit_command(text: str) -> dict:
         print(f"DEBUG: Text contains email address, skipping edit command extraction")
         return None
     
+    # ВАЖНО: Проверяем что это НЕ команда контакта
+    text_lower = text.lower()
+    contact_exclusions = ['контакт', 'номер', 'телефон', '+7', '+3', '+8', '+9']
+    found_exclusions = [ex for ex in contact_exclusions if ex in text_lower]
+    if found_exclusions:
+        print(f"DEBUG: Email edit skipped - found contact exclusions: {found_exclusions}")
+        return None
+    
     # Сначала нормализуем текст для голосовых команд
     # Убираем лишние слова типа "пиши" в начале
     normalized_text = text.strip()
@@ -887,7 +895,9 @@ async def handle_text_message(message: Message):
         # Проверяем, является ли это командой редактирования email (ТОЛЬКО если не создание письма)
         edit_command = None
         if not email_info:
+            print(f"DEBUG: Checking for email edit command in text: '{user_message}'")
             edit_command = await extract_email_edit_command(user_message)
+            print(f"DEBUG: Email edit extraction result: {edit_command}")
         
         # Проверяем, является ли это командой поиска писем
         search_query = await extract_search_query(user_message)
