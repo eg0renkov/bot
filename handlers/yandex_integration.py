@@ -923,12 +923,13 @@ def create_calendar_setup_menu():
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     builder = InlineKeyboardBuilder()
     builder.add(
-        InlineKeyboardButton(text="📅 Подключить календарь", callback_data="calendar_setup_start"),
+        InlineKeyboardButton(text="🚀 Подключить календарь", callback_data="calendar_setup_start"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
         InlineKeyboardButton(text="🔑 Что такое пароль приложения?", callback_data="calendar_setup_help"),
         InlineKeyboardButton(text="✅ Проверить подключение", callback_data="calendar_setup_check"),
         InlineKeyboardButton(text="◀️ Назад в меню", callback_data="menu_back")
     )
-    builder.adjust(1, 1, 1, 1)
+    builder.adjust(1, 1, 1, 1, 1)
     return builder.as_markup()
 
 def create_calendar_confirmation_menu():
@@ -984,19 +985,25 @@ async def connect_calendar_handler(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "calendar_setup_start")
 async def calendar_setup_step1(callback: CallbackQuery, state: FSMContext):
     """Шаг 1: Ввод email для календаря"""
-    cancel_keyboard = create_cancel_keyboard()
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    
+    navigation_keyboard = InlineKeyboardBuilder()
+    navigation_keyboard.add(
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_calendar"),
+        InlineKeyboardButton(text="❌ Отменить", callback_data="calendar_setup_cancel")
+    )
+    navigation_keyboard.adjust(1, 2)
     
     await callback.message.edit_text(
         "📅 <b>Шаг 1 из 3: Ваш email</b>\n\n"
         "📝 Введите ваш email от Яндекс:\n"
         "(например: your_name@yandex.ru)\n\n"
-        "⚠️ <b>Важно:</b> Поддерживаются только адреса:\n"
-        "• @yandex.ru\n"
-        "• @yandex.com\n"
-        "• @ya.ru\n"
-        "• @narod.ru\n\n"
+        "⚠️ <b>Поддерживаются только адреса:</b>\n"
+        "• @yandex.ru • @yandex.com • @ya.ru • @narod.ru\n\n"
+        "📚 <b>Нужна помощь?</b> Посмотрите подробную инструкцию\n\n"
         "✏️ <i>Напишите ваш email в следующем сообщении</i>",
-        reply_markup=cancel_keyboard,
+        reply_markup=navigation_keyboard.as_markup(),
         parse_mode="HTML"
     )
     
@@ -1006,25 +1013,30 @@ async def calendar_setup_step1(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "calendar_setup_help")
 async def calendar_setup_help(callback: CallbackQuery):
     """Справка по паролю приложения для календаря"""
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    
+    help_keyboard = InlineKeyboardBuilder()
+    help_keyboard.add(
+        InlineKeyboardButton(text="📘 Подробная инструкция с картинками", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="🚀 Продолжить настройку", callback_data="calendar_setup_start"),
+        InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_calendar")
+    )
+    help_keyboard.adjust(1, 2)
+    
     await callback.message.edit_text(
-        "🔑 <b>Пароль приложения для календаря</b>\n\n"
-        "📱 <b>Пароль приложения</b> - это специальный пароль для доступа "
-        "к календарю Яндекс через сторонние приложения.\n\n"
-        "🛡️ <b>Это безопасно:</b>\n"
-        "• Отдельный пароль только для календаря\n"
-        "• Можно отозвать в любой момент\n"
-        "• Не даёт доступ к основному аккаунту\n\n"
-        "📋 <b>Как получить пароль приложения:</b>\n\n"
-        "1️⃣ Зайдите на <b>id.yandex.ru</b>\n"
-        "2️⃣ Перейдите в <b>\"Безопасность\"</b>\n"
-        "3️⃣ Включите <b>\"Двухфакторную аутентификацию\"</b> (если ещё не включена)\n"
-        "4️⃣ Найдите <b>\"Пароли приложений\"</b>\n"
-        "5️⃣ Нажмите <b>\"Создать пароль\"</b>\n"
-        "6️⃣ Введите название: <b>\"Telegram Bot Календарь\"</b>\n"
-        "7️⃣ Скопируйте полученный пароль\n\n"
-        "💡 <b>Пароль выглядит так:</b> <code>abcdabcdabcdabcd</code>\n\n"
-        "❓ <b>Нужна помощь?</b> Напишите \"помощь с настройкой календаря\"",
-        reply_markup=create_calendar_setup_menu(),
+        "🔑 <b>Пароль приложения - что это?</b>\n\n"
+        "🤖 Это специальный пароль для подключения календаря к боту.\n"
+        "🛡️ <b>Безопасно:</b> отдельный от основного пароля, можно отозвать.\n\n"
+        "🚀 <b>Быстрое создание (3 минуты):</b>\n\n"
+        "1️⃣ Откройте <code>id.yandex.ru</code>\n"
+        "2️⃣ Войдите в аккаунт → Безопасность\n"
+        "3️⃣ Включите 2FA (если не включена)\n"
+        "4️⃣ Пароли приложений → Создать\n"
+        "5️⃣ Название: \"Calendar Bot\"\n"
+        "6️⃣ Скопируйте пароль в бот\n\n"
+        "💡 <b>Пароль:</b> 16 символов, например <code>abcd1234abcd1234</code>\n\n"
+        "📚 <b>Нужна помощь?</b> Посмотрите подробную инструкцию с картинками!",
+        reply_markup=help_keyboard.as_markup(),
         parse_mode="HTML"
     )
     await callback.answer()
@@ -1107,17 +1119,29 @@ async def calendar_setup_email_handler(message: Message, state: FSMContext):
     
     cancel_keyboard = create_cancel_keyboard()
     
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    
+    navigation_keyboard = InlineKeyboardBuilder()
+    navigation_keyboard.add(
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="◀️ Изменить email", callback_data="calendar_setup_edit_email"),
+        InlineKeyboardButton(text="❌ Отменить", callback_data="calendar_setup_cancel")
+    )
+    navigation_keyboard.adjust(1, 2)
+    
     await message.answer(
+        "✅ <b>Email принят!</b>\n\n"
+        f"📧 <b>Ваш email:</b> {email}\n\n"
         "🔑 <b>Шаг 2 из 3: Пароль приложения</b>\n\n"
-        f"✅ Email принят: <code>{email}</code>\n\n"
-        "📝 Теперь введите пароль приложения:\n\n"
-        "💡 <b>Как получить пароль:</b>\n"
-        "1. Откройте id.yandex.ru → Безопасность\n"
-        "2. Найдите \"Пароли приложений\"\n"
-        "3. Создайте новый пароль\n\n"
-        "🔐 <b>Пример пароля:</b> <code>abcdabcdabcdabcd</code>\n\n"
-        "✏️ <i>Отправьте пароль следующим сообщением</i>",
-        reply_markup=cancel_keyboard,
+        "📋 <b>Что такое пароль приложения?</b>\n"
+        "Специальный пароль для безопасного подключения календаря к боту.\n\n"
+        "🚀 <b>Как получить:</b>\n"
+        "1. Откройте <code>id.yandex.ru</code>\n"
+        "2. Безопасность → Пароли приложений\n"
+        "3. Создайте пароль для \"Calendar Bot\"\n\n"
+        "📚 <b>Подробная инструкция</b> с картинками доступна по кнопке выше\n\n"
+        "🔐 <i>Введите пароль приложения в следующем сообщении:</i>",
+        reply_markup=navigation_keyboard.as_markup(),
         parse_mode="HTML"
     )
     
@@ -1262,13 +1286,23 @@ async def calendar_setup_save(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "calendar_setup_edit_email")
 async def calendar_setup_edit_email(callback: CallbackQuery, state: FSMContext):
     """Редактировать email"""
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    
+    navigation_keyboard = InlineKeyboardBuilder()
+    navigation_keyboard.add(
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_calendar"),
+        InlineKeyboardButton(text="❌ Отменить", callback_data="calendar_setup_cancel")
+    )
+    navigation_keyboard.adjust(1, 2)
+    
     await callback.message.edit_text(
-        "✏️ <b>Редактирование email</b>\n\n"
+        "✏️ <b>Изменить email</b>\n\n"
         "📝 Введите новый email от Яндекс:\n"
         "(например: your_name@yandex.ru)\n\n"
-        "✅ <b>Поддерживаемые домены:</b>\n"
-        "• @yandex.ru • @yandex.com\n"
-        "• @ya.ru • @narod.ru",
+        "⚠️ <b>Поддерживаются только адреса:</b>\n"
+        "• @yandex.ru • @yandex.com • @ya.ru • @narod.ru",
+        reply_markup=navigation_keyboard.as_markup(),
         parse_mode="HTML"
     )
     
@@ -1278,14 +1312,24 @@ async def calendar_setup_edit_email(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "calendar_setup_edit_password")
 async def calendar_setup_edit_password(callback: CallbackQuery, state: FSMContext):
     """Редактировать пароль"""
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    
+    navigation_keyboard = InlineKeyboardBuilder()
+    navigation_keyboard.add(
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="◀️ Изменить email", callback_data="calendar_setup_edit_email"),
+        InlineKeyboardButton(text="❌ Отменить", callback_data="calendar_setup_cancel")
+    )
+    navigation_keyboard.adjust(1, 2)
+    
     await callback.message.edit_text(
-        "🔑 <b>Редактирование пароля</b>\n\n"
-        "📝 Введите новый пароль приложения:\n\n"
-        "💡 <b>Получить новый пароль:</b>\n"
-        "1. id.yandex.ru → Безопасность\n"
-        "2. Пароли приложений\n"
-        "3. Создать новый\n\n"
-        "🔐 <b>Пример:</b> <code>abcdabcdabcdabcd</code>",
+        "🔑 <b>Изменить пароль приложения</b>\n\n"
+        "🔐 Введите новый пароль приложения:\n\n"
+        "💡 <b>Где получить:</b>\n"
+        "1. <code>id.yandex.ru</code> → Безопасность\n"
+        "2. Создайте пароль для \"Calendar Bot\"\n\n"
+        "📚 Подробная инструкция доступна по кнопке выше",
+        reply_markup=navigation_keyboard.as_markup(),
         parse_mode="HTML"
     )
     
