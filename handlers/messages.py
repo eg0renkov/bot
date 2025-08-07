@@ -1408,7 +1408,17 @@ async def check_and_create_contact(message: Message, user_message: str, ai_respo
         
         # Паттерны для обнаружения команд создания контактов
         contact_patterns = [
-            # Основные команды
+            # Основные команды с именем и номером телефона
+            r"добав[ьи]\s+контакт\s+([А-Яа-я]+(?:\s+[А-Яа-я]+)*)\s+(\+?[0-9\-\(\)\s]{7,15})",
+            r"создай\s+контакт\s+([А-Яа-я]+(?:\s+[А-Яа-я]+)*)\s+(\+?[0-9\-\(\)\s]{7,15})",
+            r"сохрани\s+контакт\s+([А-Яа-я]+(?:\s+[А-Яа-я]+)*)\s+(\+?[0-9\-\(\)\s]{7,15})",
+            r"запиши\s+контакт\s+([А-Яа-я]+(?:\s+[А-Яа-я]+)*)\s+(\+?[0-9\-\(\)\s]{7,15})",
+            
+            # С именем и email
+            r"добав[ьи]\s+контакт\s+([А-Яа-я]+(?:\s+[А-Яа-я]+)*)\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+            r"создай\s+контакт\s+([А-Яа-я]+(?:\s+[А-Яа-я]+)*)\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+            
+            # Основные команды только с именем (fallback)
             r"добав[ьи]\s+контакт\s+(.+)",
             r"создай\s+контакт\s+(.+)",
             r"сохрани\s+контакт\s+(.+)",
@@ -1420,7 +1430,7 @@ async def check_and_create_contact(message: Message, user_message: str, ai_respo
             r"мое\s+имя\s+(.+)",
             r"я\s+([А-Яа-я]{2,}(?:\s+[А-Яа-я]{2,})*)",
             
-            # С именем и email
+            # Старые паттерны для обратной совместимости
             r"добав[ьи]\s+(.+?)\s*[-–—]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
             r"контакт\s+(.+?)\s*[-–—]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
             
@@ -1437,15 +1447,21 @@ async def check_and_create_contact(message: Message, user_message: str, ai_respo
                 print(f"DEBUG: Contact creation pattern matched: {pattern}")
                 
                 if len(match.groups()) >= 2:
-                    # Есть и имя и email
+                    # Есть и имя и второй параметр (email или телефон)
                     name = match.group(1).strip()
-                    email = match.group(2).strip() if match.group(2) else None
+                    second_param = match.group(2).strip() if match.group(2) else None
                     
-                    # Если email во второй группе, используем его
-                    if '@' in match.group(2):
-                        email = match.group(2).strip()
+                    # Определяем, что во второй группе - email или телефон
+                    if second_param and '@' in second_param:
+                        # Это email
+                        email = second_param.strip()
+                        phone = None
+                    elif second_param and (second_param.startswith('+') or re.match(r'^[0-9\-\(\)\s]+$', second_param)):
+                        # Это номер телефона
+                        phone = second_param.strip()
+                        email = None
                     elif '@' in match.group(1):
-                        # Если email в первой группе, парсим по-другому
+                        # Email в первой группе, парсим по-другому
                         parts = match.group(1).strip().split()
                         email_part = None
                         name_parts = []
@@ -1458,22 +1474,39 @@ async def check_and_create_contact(message: Message, user_message: str, ai_respo
                         
                         name = ' '.join(name_parts).strip()
                         email = email_part
+                        phone = None
+                    else:
+                        email = None
+                        phone = None
                 else:
                     # Только один параметр - парсим его
                     contact_text = match.group(1).strip()
                     
                     # Пытаемся найти email в тексте
                     email_match = re.search(r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', contact_text)
+                    
+                    # Пытаемся найти телефон в тексте
+                    phone_match = re.search(r'(\+?[0-9\-\(\)\s]{7,15})', contact_text)
+                    
                     if email_match:
                         email = email_match.group(1)
+                        phone = None
                         # Имя - это всё остальное
                         name = contact_text.replace(email, '').strip()
                         # Убираем лишние символы
                         name = re.sub(r'[-–—\s]+$', '', name).strip()
+                    elif phone_match:
+                        phone = phone_match.group(1)
+                        email = None
+                        # Имя - это всё остальное
+                        name = contact_text.replace(phone, '').strip()
+                        # Убираем лишние символы
+                        name = re.sub(r'[-–—\s]+$', '', name).strip()
                     else:
-                        # Нет email, только имя
+                        # Нет email и телефона, только имя
                         name = contact_text
                         email = None
+                        phone = None
                 
                 if name and len(name) > 1:
                     # Исправляем склонение имен перед созданием контакта
@@ -1484,7 +1517,7 @@ async def check_and_create_contact(message: Message, user_message: str, ai_respo
                         r"меня\s+зовут", r"мое\s+имя", r"я\s+"
                     ])
                     
-                    await create_contact_from_text(message, corrected_name, email, user_id, is_self_introduction)
+                    await create_contact_from_text(message, corrected_name, email, user_id, is_self_introduction, phone)
                     return True
         
         # Проверяем ответ AI на наличие информации о контактах
@@ -1605,7 +1638,7 @@ async def handle_name_questions(message: Message, user_message: str, ai_response
         print(f"Ошибка обработки вопроса об имени: {e}")
         return False
 
-async def create_contact_from_text(message: Message, name: str, email: str, user_id: int, is_self_introduction: bool = False):
+async def create_contact_from_text(message: Message, name: str, email: str, user_id: int, is_self_introduction: bool = False, phone: str = None):
     """Создает контакт на основе извлеченных данных"""
     try:
         # Импортируем необходимые модули
@@ -1653,7 +1686,7 @@ async def create_contact_from_text(message: Message, name: str, email: str, user
         new_contact = Contact(
             name=name,
             email=email or '',
-            phone='',
+            phone=phone or '',
             notes=notes
         )
         
@@ -1679,8 +1712,10 @@ async def create_contact_from_text(message: Message, name: str, email: str, user
                 if email:
                     success_message += f"📧 <b>Email:</b> {email}\n"
                 
-                success_message += f"🆔 <b>ID:</b> {contact_id}\n\n"
-                success_message += f"💡 Найти контакт: Меню → 👥 Контакты"
+                if phone:
+                    success_message += f"📱 <b>Телефон:</b> {phone}\n"
+                
+                success_message += f"\n💡 Найти контакт: Меню → 👥 Контакты"
             
             # Создаем клавиатуру с действиями
             from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -1705,7 +1740,7 @@ async def create_contact_from_text(message: Message, name: str, email: str, user
                 reply_markup=builder.as_markup()
             )
             
-            print(f"DEBUG: Contact created successfully - ID: {contact_id}, Name: {name}, Email: {email}")
+            print(f"DEBUG: Contact created successfully - ID: {contact_id}, Name: {name}, Email: {email}, Phone: {phone}")
             return True
         else:
             await message.answer("❌ Ошибка при создании контакта")
