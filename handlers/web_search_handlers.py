@@ -244,13 +244,84 @@ async def new_search(callback: CallbackQuery, state: FSMContext):
     """Новый поиск"""
     await web_search_menu(callback)
 
+@router.callback_query(F.data == "analyze_news")
+async def analyze_search_results(callback: CallbackQuery):
+    """Проанализировать результаты поиска с помощью AI"""
+    try:
+        # Показываем индикатор анализа
+        analysis_msg = await callback.message.edit_text(
+            text="🧠 Анализирую результаты поиска с помощью AI...\n\n⏳ Пожалуйста, подождите...",
+            reply_markup=None
+        )
+        
+        try:
+            # Извлекаем текст предыдущего сообщения для анализа
+            original_text = callback.message.text or callback.message.caption or ""
+            
+            if not original_text or len(original_text) < 50:
+                await analysis_msg.edit_text(
+                    text="❌ Не найдено результатов для анализа.\n\nВыполните новый поиск.",
+                    reply_markup=keyboards.search_results_menu()
+                )
+                return
+            
+            # Используем OpenAI для анализа результатов поиска
+            from utils.openai_client import openai_client
+            
+            prompt = f"""Проанализируй следующие результаты поиска и создай краткую сводку (3-5 предложений) с ключевыми выводами:
+
+{original_text}
+
+Сводка должна быть на русском языке, краткой и содержать основные факты и выводы из найденной информации."""
+
+            messages = [
+                {"role": "system", "content": "Ты - аналитик информации. Создавай краткие и точные сводки по результатам поиска."},
+                {"role": "user", "content": prompt}
+            ]
+            
+            ai_analysis = await openai_client.chat_completion(messages)
+            
+            # Формируем итоговый ответ
+            summary = f"🧠 **AI-анализ результатов поиска:**\n\n{ai_analysis}\n\n📊 _Анализ основан на найденной информации_"
+            
+            # Обрезаем результат если он слишком длинный
+            summary = truncate_message(summary)
+            
+            # Создаем клавиатуру
+            keyboard = keyboards.search_results_menu()
+            
+            await analysis_msg.edit_text(
+                text=summary,
+                reply_markup=keyboard,
+                parse_mode="Markdown",
+                disable_web_page_preview=True
+            )
+            
+        except Exception as analysis_error:
+            logger.error(f"Ошибка AI-анализа: {analysis_error}")
+            await analysis_msg.edit_text(
+                text=f"❌ Ошибка AI-анализа: {analysis_error}\n\nПопробуйте позже.",
+                reply_markup=keyboards.search_results_menu()
+            )
+    
+    except Exception as e:
+        logger.error(f"Ошибка обработчика analyze_search_results: {e}")
+        await callback.answer("❌ Ошибка анализа результатов")
+
 @router.callback_query(F.data == "search_to_menu")
 async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
     """Вернуться в главное меню"""
     await state.clear()
     
-    from handlers.menu_handlers import show_main_menu
-    await show_main_menu(callback)
+    # Показываем главное меню
+    from utils.keyboards import BotKeyboards
+    keyboards = BotKeyboards()
+    
+    await callback.message.edit_text(
+        text="📱 **Главное меню**\n\nВыберите нужную функцию:",
+        reply_markup=keyboards.full_menu(),
+        parse_mode="Markdown"
+    )
 
 # Команда для быстрого поиска из любого места
 @router.message(F.text.startswith("/search "))

@@ -208,23 +208,29 @@ async def category_calendar_callback(callback: CallbackQuery):
     """Категория: Календарь"""
     user_id = callback.from_user.id
     from database.user_tokens import user_tokens
+    from utils.user_settings import user_settings
     
     # Проверяем подключение календаря
     token_data = await user_tokens.get_token_data(user_id, "calendar")
     is_connected = bool(token_data and token_data.get("app_password"))
     
+    # Получаем настройку автосинхронизации
+    auto_sync = user_settings.get_setting(user_id, "calendar.auto_sync_reminders", False)
+    
     status = "✅ Подключен" if is_connected else "❌ Не подключен"
+    sync_status = "✅ Включена" if auto_sync else "❌ Отключена"
     
     await callback.message.edit_text(
         f"📅 <b>Календарь</b>\n\n"
-        f"📊 <b>Статус:</b> {status}\n\n"
+        f"📊 <b>Статус:</b> {status}\n"
+        f"🔄 <b>Автосинхронизация:</b> {sync_status}\n\n"
         "🎯 <b>Возможности:</b>\n"
         "• Создание событий голосом\n"
         "• Умные напоминания\n"
         "• Анализ расписания\n"
         "• Планирование встреч\n\n"
         "📌 <b>Выберите действие:</b>",
-        reply_markup=keyboards.calendar_menu(),
+        reply_markup=keyboards.calendar_menu(user_id, auto_sync),
         parse_mode="HTML"
     )
     await callback.answer()

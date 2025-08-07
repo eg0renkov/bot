@@ -398,13 +398,20 @@ class WebSearcher:
                     title = news.get('title', 'Без названия')[:100]
                     source = news.get('source', 'Источник не указан')
                     date = news.get('date', '')
+                    link = news.get('link', '')
+                    snippet = news.get('snippet', '')[:120]
                     
-                    news_summary += f"**{i}. {title}**\n"
+                    news_summary += f"📰 **{i}. {title}**\n"
                     if source:
                         news_summary += f"   📡 {source}"
                     if date:
                         news_summary += f" | 📅 {date}"
-                    news_summary += "\n\n"
+                    news_summary += "\n"
+                    if snippet:
+                        news_summary += f"   {snippet}...\n"
+                    if link:
+                        news_summary += f"   🔗 [Ссылка на источник]({link})\n"
+                    news_summary += "\n"
                 
                 # Если AI доступен, добавляем краткий анализ
                 try:

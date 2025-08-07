@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from datetime import datetime
 
 class BotKeyboards:
     """Клавиатуры для бота"""
@@ -102,7 +103,7 @@ class BotKeyboards:
         return builder.as_markup()
     
     @staticmethod
-    def calendar_menu() -> InlineKeyboardMarkup:
+    def calendar_menu(user_id: int = None, auto_sync_enabled: bool = False) -> InlineKeyboardMarkup:
         """Меню календаря"""
         builder = InlineKeyboardBuilder()
         
@@ -116,8 +117,11 @@ class BotKeyboards:
             InlineKeyboardButton(text="🔗 Подключить календарь", callback_data="calendar_connect")
         )
         
+        # Кнопка автосинхронизации с индикатором состояния
+        sync_icon = "✅" if auto_sync_enabled else "❌"
+        sync_text = f"🔄 Автосинхронизация: {sync_icon}"
         builder.add(
-            InlineKeyboardButton(text="🔄 Синхронизировать с напоминаниями", callback_data="calendar_sync_reminders")
+            InlineKeyboardButton(text=sync_text, callback_data="calendar_toggle_sync")
         )
         
         builder.add(
@@ -263,7 +267,11 @@ class BotKeyboards:
         )
         
         builder.add(
-            InlineKeyboardButton(text="✏️ Редактировать тему", callback_data=f"email_edit_subject_{email_id}"),
+            InlineKeyboardButton(text="🧠 Дополнить AI", callback_data=f"email_expand_{email_id}"),
+            InlineKeyboardButton(text="✏️ Редактировать тему", callback_data=f"email_edit_subject_{email_id}")
+        )
+        
+        builder.add(
             InlineKeyboardButton(text="📝 Редактировать текст", callback_data=f"email_edit_body_{email_id}")
         )
         
@@ -417,11 +425,15 @@ class BotKeyboards:
         builder = InlineKeyboardBuilder()
         
         builder.add(
-            InlineKeyboardButton(text="🔍 Новый поиск", callback_data="search_new_query"),
+            InlineKeyboardButton(text="🧠 Проанализировать", callback_data="analyze_news"),
+            InlineKeyboardButton(text="🔍 Новый поиск", callback_data="search_new_query")
+        )
+        
+        builder.add(
             InlineKeyboardButton(text="🏠 В меню", callback_data="search_to_menu")
         )
         
-        builder.adjust(2)
+        builder.adjust(2, 1)
         return builder.as_markup()
     
     @staticmethod
@@ -582,7 +594,7 @@ class ReminderKeyboards:
         # Переключатели настроек
         enabled_icon = "✅" if settings.get('enabled', True) else "❌"
         sound_icon = "✅" if settings.get('sound_enabled', True) else "❌"
-        summary_icon = "✅" if settings.get('daily_summary', False) else "❌"
+        notify_at_event_icon = "✅" if settings.get('notify_at_event', False) else "❌"
         
         builder.add(
             InlineKeyboardButton(
@@ -600,25 +612,25 @@ class ReminderKeyboards:
         
         builder.add(
             InlineKeyboardButton(
-                text=f"📋 Ежедневная сводка: {summary_icon}",
-                callback_data="setting_toggle_daily_summary"
+                text=f"📅 Уведомлять в момент события: {notify_at_event_icon}",
+                callback_data="setting_toggle_notify_at_event"
             )
         )
         
-        builder.add(
-            InlineKeyboardButton(text="⏰ Время по умолчанию", callback_data="setting_notification_time"),
-            InlineKeyboardButton(text="⏱️ Предупреждать за", callback_data="setting_advance_time")
-        )
+        # Настройки времени
+        advance_time = settings.get('advance_time', 15)
+        timezone = settings.get('timezone', 'Europe/Moscow').replace('Europe/', '').replace('_', ' ')
         
         builder.add(
-            InlineKeyboardButton(text="🕐 Часовой пояс", callback_data="setting_timezone")
+            InlineKeyboardButton(text=f"⏱️ За {advance_time} мин", callback_data="setting_advance_time"),
+            InlineKeyboardButton(text=f"🕐 {timezone}", callback_data="setting_timezone")
         )
         
         builder.add(
             InlineKeyboardButton(text="◀️ Назад", callback_data="reminders_menu")
         )
         
-        builder.adjust(1, 1, 1, 2, 1, 1)
+        builder.adjust(1, 1, 1, 2, 1)
         return builder.as_markup()
     
     @staticmethod
@@ -647,6 +659,108 @@ class ReminderKeyboards:
         )
         
         builder.adjust(3, 3, 1, 1)
+        return builder.as_markup()
+    
+    @staticmethod
+    def timezone_menu() -> InlineKeyboardMarkup:
+        """Меню выбора часового пояса"""
+        builder = InlineKeyboardBuilder()
+        
+        # Основные часовые пояса
+        timezones = [
+            ("🇷🇺 Москва (UTC+3)", "Europe/Moscow"),
+            ("🇷🇺 СПб (UTC+3)", "Europe/Moscow"),
+            ("🇷🇺 Екатеринбург (UTC+5)", "Asia/Yekaterinburg"),
+            ("🇷🇺 Новосибирск (UTC+7)", "Asia/Novosibirsk"),
+            ("🇷🇺 Красноярск (UTC+7)", "Asia/Krasnoyarsk"),
+            ("🇷🇺 Иркутск (UTC+8)", "Asia/Irkutsk"),
+            ("🇷🇺 Владивосток (UTC+10)", "Asia/Vladivostok"),
+            ("🇺🇦 Киев (UTC+2)", "Europe/Kiev"),
+            ("🇰🇿 Алматы (UTC+6)", "Asia/Almaty"),
+            ("🇧🇾 Минск (UTC+3)", "Europe/Minsk")
+        ]
+        
+        for name, tz in timezones:
+            builder.add(
+                InlineKeyboardButton(text=name, callback_data=f"tz_{tz}")
+            )
+        
+        builder.add(
+            InlineKeyboardButton(text="◀️ Назад", callback_data="reminder_settings")
+        )
+        
+        builder.adjust(1)
+        return builder.as_markup()
+    
+    @staticmethod
+    def calendar_events_menu(events: list, back_to_calendar: bool = True) -> InlineKeyboardMarkup:
+        """Меню со списком событий календаря"""
+        builder = InlineKeyboardBuilder()
+        
+        # Добавляем кликабельные события (максимум 8)
+        for i, event in enumerate(events[:8]):
+            # Безопасно получаем ID события
+            event_id = str(event.get('id', event.get('uid', f'event_{i}')))
+            title = str(event.get('summary', 'Без названия'))[:25]  # Ограничиваем длину
+            
+            # Добавляем время если есть
+            start = event.get('start', {})
+            start_time = start.get('dateTime', '') if isinstance(start, dict) else ''
+            
+            if start_time:
+                try:
+                    # Убираем временную зону и парсим
+                    clean_time = start_time.replace("Z", "+00:00")
+                    event_time = datetime.fromisoformat(clean_time)
+                    time_str = event_time.strftime("%H:%M")
+                    button_text = f"🗓️ {time_str} - {title}"
+                except Exception as e:
+                    print(f"Error parsing time {start_time}: {e}")
+                    button_text = f"🗓️ {title}"
+            else:
+                button_text = f"🗓️ {title}"
+                
+            # Убеждаемся что callback_data не слишком длинный
+            safe_event_id = event_id[:30]  # Ограничиваем длину ID
+            
+            builder.add(
+                InlineKeyboardButton(text=button_text, callback_data=f"calendar_event_{safe_event_id}")
+            )
+        
+        # Кнопка назад
+        if back_to_calendar:
+            builder.add(
+                InlineKeyboardButton(text="◀️ К календарю", callback_data="category_calendar")
+            )
+        else:
+            builder.add(
+                InlineKeyboardButton(text="◀️ В меню", callback_data="menu_back")
+            )
+        
+        # Настраиваем layout: по одному событию в ряду, кнопка назад отдельно
+        builder.adjust(1)  # Все кнопки в один столбец
+        return builder.as_markup()
+    
+    @staticmethod
+    def calendar_event_actions(event_id: str) -> InlineKeyboardMarkup:
+        """Меню действий с конкретным событием"""
+        builder = InlineKeyboardBuilder()
+        
+        builder.add(
+            InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"calendar_edit_{event_id}"),
+            InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"calendar_delete_{event_id}")
+        )
+        
+        builder.add(
+            InlineKeyboardButton(text="🧠 Дополнить AI", callback_data=f"calendar_expand_{event_id}")
+        )
+        
+        builder.add(
+            InlineKeyboardButton(text="◀️ К событиям", callback_data="calendar_today"),
+            InlineKeyboardButton(text="🏠 К календарю", callback_data="category_calendar")
+        )
+        
+        builder.adjust(2, 1, 2)
         return builder.as_markup()
 
 keyboards = BotKeyboards()

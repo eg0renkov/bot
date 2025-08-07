@@ -11,7 +11,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from config.settings import settings
-from utils.keyboards import keyboards
+from utils.keyboards import BotKeyboards, ReminderKeyboards
 from database.user_tokens import user_tokens
 from utils.html_utils import escape_html, escape_email
 from utils.calendar_reminder_sync import CalendarReminderSync
@@ -397,6 +397,33 @@ class YandexCalendar:
         import asyncio
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.create_event_sync, title, start_time, end_time, description)
+    
+    def delete_event_sync(self, event_id: str) -> bool:
+        """Синхронное удаление события из календаря"""
+        try:
+            if not self.client:
+                self._connect()
+            
+            # Поиск и удаление события по UID
+            for calendar in self.client.calendars():
+                for event in calendar.events():
+                    if event.id == event_id or str(event.id) == event_id:
+                        event.delete()
+                        print(f"DEBUG: Событие {event_id} успешно удалено")
+                        return True
+            
+            print(f"DEBUG: Событие {event_id} не найдено для удаления")
+            return False
+            
+        except Exception as e:
+            print(f"Ошибка удаления события {event_id}: {e}")
+            return False
+    
+    async def delete_event(self, event_id: str) -> bool:
+        """Асинхронная обертка для удаления события"""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.delete_event_sync, event_id)
 
 # Обработчики для интеграции
 yandex_integration = YandexIntegration()
@@ -417,7 +444,7 @@ async def mail_inbox_handler(callback: CallbackQuery):
         "• Быстрые действия\n"
         "• AI анализ содержимого\n\n"
         "🚧 <i>Функция в разработке</i>",
-        reply_markup=keyboards.back_button("menu_back"),
+        reply_markup=BotKeyboards.back_button("menu_back"),
         parse_mode="HTML"
     )
     await callback.answer()
@@ -439,7 +466,7 @@ async def mail_compose_handler(callback: CallbackQuery, state: FSMContext):
             "• Создавать письма с AI помощью\n"
             "• Использовать контакты\n"
             "• Отправлять сразу или сохранять черновики",
-            reply_markup=keyboards.back_button("menu_back"),
+            reply_markup=BotKeyboards.back_button("menu_back"),
             parse_mode="HTML"
         )
         await callback.answer()
@@ -457,7 +484,7 @@ async def mail_compose_handler(callback: CallbackQuery, state: FSMContext):
         "🤖 <b>С AI помощью:</b> Опишите задачу\n"
         "<i>Пример: \"письмо боссу о отпуске\"</i>\n\n"
         "✍️ <i>Напишите ваш выбор в следующем сообщении</i>",
-        reply_markup=keyboards.create_cancel_button("mail_compose_cancel"),
+        reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel"),
         parse_mode="HTML"
     )
     
@@ -569,32 +596,55 @@ async def calendar_today_handler(callback: CallbackQuery):
         events = await calendar_client.get_events(start_date, end_date)
         print(f"DEBUG: Получено событий: {len(events) if events else 0}")
         
-        if events:
-            events_text = ""
-            for event in events[:5]:  # Показываем максимум 5 событий
-                title = event.get("summary", "Без названия")
-                start = event.get("start", {}).get("dateTime", "")
-                if start:
-                    try:
-                        event_time = datetime.fromisoformat(start.replace("Z", "+00:00"))
-                        time_str = event_time.strftime("%H:%M")
-                        events_text += f"• {time_str} - {title}\n"
-                    except:
+        # Показываем события с интерактивными кнопками
+        if events and len(events) > 0:
+            try:
+                message_text = f"📅 <b>События на {today.strftime('%d.%m.%Y')}</b>\n\n"
+                message_text += f"📊 <i>Найдено событий: {len(events)}</i>\n\n"
+                message_text += "👆 <i>Выберите событие для просмотра и редактирования:</i>"
+                
+                # Пробуем создать клавиатуру
+                keyboard = ReminderKeyboards.calendar_events_menu(events, back_to_calendar=True)
+                
+                await callback.message.edit_text(
+                    message_text,
+                    reply_markup=keyboard,
+                    parse_mode="HTML"
+                )
+            except Exception as keyboard_error:
+                print(f"Ошибка создания клавиатуры событий: {keyboard_error}")
+                # Fallback на простой список
+                events_text = ""
+                for i, event in enumerate(events[:5]):
+                    title = event.get("summary", "Без названия")
+                    start = event.get("start", {}).get("dateTime", "")
+                    if start:
+                        try:
+                            event_time = datetime.fromisoformat(start.replace("Z", "+00:00"))
+                            time_str = event_time.strftime("%H:%M")
+                            events_text += f"• {time_str} - {title}\n"
+                        except:
+                            events_text += f"• {title}\n"
+                    else:
                         events_text += f"• {title}\n"
-                else:
-                    events_text += f"• {title}\n"
-            
-            message_text = f"📅 <b>События на {today.strftime('%d.%m.%Y')}</b>\n\n{events_text}"
-            if len(events) > 5:
-                message_text += f"\n... и еще {len(events) - 5} событий"
+                
+                message_text = f"📅 <b>События на {today.strftime('%d.%m.%Y')}</b>\n\n{events_text}"
+                if len(events) > 5:
+                    message_text += f"\n... и еще {len(events) - 5} событий"
+                    
+                await callback.message.edit_text(
+                    message_text,
+                    reply_markup=BotKeyboards.back_button("category_calendar"),
+                    parse_mode="HTML"
+                )
         else:
             message_text = f"📅 <b>События на {today.strftime('%d.%m.%Y')}</b>\n\n🆓 <i>На сегодня событий нет</i>"
-        
-        await callback.message.edit_text(
-            message_text,
-            reply_markup=keyboards.back_button("menu_back"),
-            parse_mode="HTML"
-        )
+            
+            await callback.message.edit_text(
+                message_text,
+                reply_markup=BotKeyboards.back_button("category_calendar"),
+                parse_mode="HTML"
+            )
         
     except Exception as e:
         print(f"Ошибка получения событий календаря: {e}")
@@ -770,7 +820,7 @@ async def calendar_week_handler(callback: CallbackQuery):
         
         await callback.message.edit_text(
             message_text,
-            reply_markup=keyboards.back_button("menu_back"),
+            reply_markup=BotKeyboards.back_button("category_calendar"),
             parse_mode="HTML"
         )
         
@@ -857,7 +907,7 @@ async def connect_mail_handler(callback: CallbackQuery, state: FSMContext):
         "• Доступ только к почте\n\n"
         f"🌐 <a href='{auth_url}'>🔗 Подключить Яндекс.Почту</a>\n\n"
         "📋 <i>После авторизации отправьте код боту</i>",
-        reply_markup=keyboards.back_button("menu_back"),
+        reply_markup=BotKeyboards.back_button("menu_back"),
         parse_mode="HTML",
         disable_web_page_preview=True
     )
@@ -1177,7 +1227,7 @@ async def calendar_setup_save(callback: CallbackQuery, state: FSMContext):
                 f"• Просматривать расписание\n"
                 f"• Использовать AI для анализа\n\n"
                 f"💡 <b>Попробуйте:</b> \"добавь встречу завтра в 15:00\"",
-                reply_markup=keyboards.back_button("menu_back"),
+                reply_markup=BotKeyboards.back_button("menu_back"),
                 parse_mode="HTML"
             )
         else:
@@ -1301,27 +1351,27 @@ async def process_auth_code(message: Message, state: FSMContext):
                     f"👤 <b>Аккаунт:</b> {user_info.get('display_name', 'Неизвестно')}\n"
                     f"📧 <b>Email:</b> {escape_email(user_info.get('default_email', 'Неизвестно'))}\n\n"
                     f"🎉 Теперь вы можете использовать все функции {service_name}!",
-                    reply_markup=keyboards.back_button("menu_back"),
+                    reply_markup=BotKeyboards.back_button("menu_back"),
                     parse_mode="HTML"
                 )
             else:
                 await message.answer(
                     "❌ Не удалось получить информацию о пользователе.\n"
                     "Попробуйте подключиться заново.",
-                    reply_markup=keyboards.back_button("menu_back")
+                    reply_markup=BotKeyboards.back_button("menu_back")
                 )
         else:
             await message.answer(
                 "❌ Неверный код авторизации.\n"
                 "Попробуйте получить новый код:",
-                reply_markup=keyboards.back_button("menu_back")
+                reply_markup=BotKeyboards.back_button("menu_back")
             )
     
     except Exception as e:
         await message.answer(
             f"❌ Ошибка при подключении: {str(e)}\n"
             "Попробуйте позже.",
-            reply_markup=keyboards.back_button("menu_back")
+            reply_markup=BotKeyboards.back_button("menu_back")
         )
     
     # Очищаем состояние
@@ -1430,7 +1480,7 @@ async def create_calendar_event(message: Message, state: FSMContext):
                 f"⏰ <b>Время:</b> {event_data.get('start_time', '').replace('T', ' ')}\n"
                 f"📝 <b>Описание:</b> {event_data.get('description', 'Без описания')}",
                 parse_mode="HTML",
-                reply_markup=keyboards.back_button("menu_back")
+                reply_markup=BotKeyboards.back_button("menu_back")
             )
         else:
             await message.answer(
@@ -1472,7 +1522,7 @@ async def process_recipient_choice(message: Message, state: FSMContext):
                 f"📝 Напишите тему письма:\n"
                 f"<i>Пример: \"Встреча по проекту\" или \"Отчет за месяц\"</i>",
                 parse_mode="HTML",
-                reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+                reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
             )
             await state.set_state(EmailComposerStates.entering_subject)
             
@@ -1491,7 +1541,7 @@ async def process_recipient_choice(message: Message, state: FSMContext):
                 f"🎯 <b>Шаг 2 из 3: Тема письма</b>\n\n"
                 f"📝 Напишите тему письма:",
                 parse_mode="HTML",
-                reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+                reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
             )
             await state.set_state(EmailComposerStates.entering_subject)
             
@@ -1514,7 +1564,7 @@ async def process_recipient_choice(message: Message, state: FSMContext):
             await message.answer(
                 response_text,
                 parse_mode="HTML",
-                reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+                reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
             )
             # Сохраняем варианты для последующего выбора
             await state.update_data(contact_matches=result['matches'])
@@ -1546,7 +1596,7 @@ async def process_recipient_choice(message: Message, state: FSMContext):
                         f"🎯 <b>Шаг 2 из 3: Тема письма</b>\n\n"
                         f"📝 Напишите тему письма:{subject_hint}",
                         parse_mode="HTML",
-                        reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+                        reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
                     )
                     await state.set_state(EmailComposerStates.entering_subject)
                 else:
@@ -1558,7 +1608,7 @@ async def process_recipient_choice(message: Message, state: FSMContext):
                         f"• Точное имя из контактов\n"
                         f"• Или email адрес напрямую",
                         parse_mode="HTML",
-                        reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+                        reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
                     )
             else:
                 # AI предложил описание роли
@@ -1570,7 +1620,7 @@ async def process_recipient_choice(message: Message, state: FSMContext):
                     f"• Имя контакта\n"
                     f"• Или email адрес",
                     parse_mode="HTML",
-                    reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+                    reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
                 )
         
         else:
@@ -1584,7 +1634,7 @@ async def process_recipient_choice(message: Message, state: FSMContext):
                 f"• Описание (\"письмо боссу\")\n\n"
                 f"💡 Или добавьте новый контакт в разделе \"Контакты\"",
                 parse_mode="HTML",
-                reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+                reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
             )
         
     except Exception as e:
@@ -1593,7 +1643,7 @@ async def process_recipient_choice(message: Message, state: FSMContext):
             f"Попробуйте еще раз или укажите email напрямую.\n\n"
             f"<code>{str(e)[:100]}...</code>",
             parse_mode="HTML",
-            reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+            reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
         )
 
 @router.message(EmailComposerStates.entering_subject)
@@ -1606,7 +1656,7 @@ async def process_email_subject(message: Message, state: FSMContext):
             "❌ <b>Тема не может быть пустой</b>\n\n"
             "📝 Пожалуйста, введите тему письма:",
             parse_mode="HTML",
-            reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+            reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
         )
         return
     
@@ -1626,7 +1676,7 @@ async def process_email_subject(message: Message, state: FSMContext):
         f"• \"Официальное письмо о смене графика\"\n\n"
         f"🤖 <i>AI поможет составить или улучшить текст</i>",
         parse_mode="HTML",
-        reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+        reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
     )
     
     await state.set_state(EmailComposerStates.entering_body)
@@ -1641,7 +1691,7 @@ async def process_email_body(message: Message, state: FSMContext):
             "❌ <b>Содержание не может быть пустым</b>\n\n"
             "✍️ Пожалуйста, введите текст письма или опишите что написать:",
             parse_mode="HTML",
-            reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+            reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
         )
         return
     
@@ -1753,7 +1803,7 @@ async def process_email_body(message: Message, state: FSMContext):
             f"<code>{str(e)[:100]}...</code>\n\n"
             f"Попробуйте еще раз или упростите запрос.",
             parse_mode="HTML",
-            reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+            reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
         )
 
 # Обработчик отмены создания письма
@@ -1765,7 +1815,7 @@ async def cancel_email_composition(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         "❌ <b>Создание письма отменено</b>\n\n"
         "🔙 Возвращаемся к почте",
-        reply_markup=keyboards.mail_menu(),
+        reply_markup=BotKeyboards.mail_menu(),
         parse_mode="HTML"
     )
     await callback.answer()
@@ -1809,7 +1859,7 @@ async def send_email_confirm(callback: CallbackQuery, state: FSMContext):
                 f"📝 Тема: {escape_html(subject)}\n"
                 f"📄 Размер: {len(body)} символов\n\n"
                 "🎉 Письмо доставлено в почтовый ящик получателя",
-                reply_markup=keyboards.mail_menu(),
+                reply_markup=BotKeyboards.mail_menu(),
                 parse_mode="HTML"
             )
         else:
@@ -1821,7 +1871,7 @@ async def send_email_confirm(callback: CallbackQuery, state: FSMContext):
                 "• Неверные настройки почты\n"
                 "• Недопустимый email адрес\n\n"
                 "💡 Проверьте настройки и попробуйте снова",
-                reply_markup=keyboards.mail_menu(),
+                reply_markup=BotKeyboards.mail_menu(),
                 parse_mode="HTML"
             )
         
@@ -1832,7 +1882,7 @@ async def send_email_confirm(callback: CallbackQuery, state: FSMContext):
             f"❌ <b>Критическая ошибка отправки</b>\n\n"
             f"<code>{str(e)[:100]}...</code>\n\n"
             "Обратитесь в поддержку",
-            reply_markup=keyboards.mail_menu(),
+            reply_markup=BotKeyboards.mail_menu(),
             parse_mode="HTML"
         )
         await state.clear()
@@ -1943,7 +1993,7 @@ async def regenerate_email_body(callback: CallbackQuery, state: FSMContext):
             f"❌ <b>Ошибка переписывания</b>\n\n"
             f"<code>{str(e)[:100]}...</code>",
             parse_mode="HTML",
-            reply_markup=keyboards.create_cancel_button("mail_compose_cancel")
+            reply_markup=BotKeyboards.create_cancel_button("mail_compose_cancel")
         )
     
     await callback.answer()
@@ -1975,14 +2025,14 @@ async def save_email_draft(callback: CallbackQuery, state: FSMContext):
                 f"👤 Получатель: {escape_html(data.get('recipient_name', 'Неизвестно'))}\n\n"
                 "✅ Черновик доступен в разделе \"📋 Черновики\"\n\n"
                 "💡 <i>Вы можете отредактировать или отправить его позже</i>",
-                reply_markup=keyboards.mail_menu(),
+                reply_markup=BotKeyboards.mail_menu(),
                 parse_mode="HTML"
             )
         else:
             await callback.message.edit_text(
                 "❌ <b>Ошибка сохранения черновика</b>\n\n"
                 "Попробуйте еще раз или обратитесь к администратору",
-                reply_markup=keyboards.mail_menu(),
+                reply_markup=BotKeyboards.mail_menu(),
                 parse_mode="HTML"
             )
         
@@ -1993,9 +2043,113 @@ async def save_email_draft(callback: CallbackQuery, state: FSMContext):
     
     await callback.answer()
 
+@router.callback_query(F.data == "calendar_toggle_sync")
+async def calendar_toggle_sync_handler(callback: CallbackQuery):
+    """Переключить автосинхронизацию календаря с напоминаниями"""
+    user_id = callback.from_user.id
+    from utils.user_settings import user_settings
+    from database.user_tokens import user_tokens
+    
+    # Переключаем настройку
+    new_state = user_settings.toggle_setting(user_id, "calendar.auto_sync_reminders")
+    
+    # Проверяем подключение календаря
+    token_data = await user_tokens.get_token_data(user_id, "calendar")
+    is_connected = bool(token_data and token_data.get("app_password"))
+    
+    status = "✅ Подключен" if is_connected else "❌ Не подключен"
+    sync_status = "✅ Включена" if new_state else "❌ Отключена"
+    
+    if new_state:
+        # Если включили автосинхронизацию - запускаем первую синхронизацию
+        if is_connected:
+            try:
+                # Инициализируем синхронизатор
+                sync = CalendarReminderSync()
+                
+                await callback.message.edit_text(
+                    "🔄 <b>Автосинхронизация включена!</b>\n\n"
+                    "⏳ Запускаю первую синхронизацию...",
+                    parse_mode="HTML"
+                )
+                
+                # Выполняем синхронизацию
+                result = await sync.sync_calendar_to_reminders(user_id, token_data)
+                
+                if result.get("success"):
+                    events_count = result.get("events_processed", 0)
+                    reminders_count = result.get("reminders_created", 0)
+                    
+                    await callback.message.edit_text(
+                        f"📅 <b>Календарь</b>\n\n"
+                        f"📊 <b>Статус:</b> {status}\n"
+                        f"🔄 <b>Автосинхронизация:</b> {sync_status}\n\n"
+                        f"✅ <b>Синхронизация завершена!</b>\n"
+                        f"• Обработано событий: {events_count}\n"
+                        f"• Создано напоминаний: {reminders_count}\n\n"
+                        "🎯 <b>Возможности:</b>\n"
+                        "• Создание событий голосом\n"
+                        "• Умные напоминания\n"
+                        "• Анализ расписания\n"
+                        "• Планирование встреч\n\n"
+                        "📌 <b>Выберите действие:</b>",
+                        reply_markup=BotKeyboards.calendar_menu(user_id, new_state),
+                        parse_mode="HTML"
+                    )
+                else:
+                    await callback.message.edit_text(
+                        f"📅 <b>Календарь</b>\n\n"
+                        f"📊 <b>Статус:</b> {status}\n"
+                        f"🔄 <b>Автосинхронизация:</b> {sync_status}\n\n"
+                        f"⚠️ <b>Ошибка синхронизации:</b>\n"
+                        f"{result.get('error', 'Неизвестная ошибка')}\n\n"
+                        "📌 <b>Выберите действие:</b>",
+                        reply_markup=BotKeyboards.calendar_menu(user_id, new_state),
+                        parse_mode="HTML"
+                    )
+            except Exception as e:
+                await callback.message.edit_text(
+                    f"📅 <b>Календарь</b>\n\n"
+                    f"📊 <b>Статус:</b> {status}\n"
+                    f"🔄 <b>Автосинхронизация:</b> {sync_status}\n\n"
+                    f"❌ <b>Ошибка:</b> {str(e)}\n\n"
+                    "📌 <b>Выберите действие:</b>",
+                    reply_markup=BotKeyboards.calendar_menu(user_id, new_state),
+                    parse_mode="HTML"
+                )
+        else:
+            await callback.message.edit_text(
+                f"📅 <b>Календарь</b>\n\n"
+                f"📊 <b>Статус:</b> {status}\n"
+                f"🔄 <b>Автосинхронизация:</b> {sync_status}\n\n"
+                "⚠️ <b>Внимание!</b>\n"
+                "Автосинхронизация включена, но календарь не подключен.\n"
+                "Подключите календарь для работы синхронизации.\n\n"
+                "📌 <b>Выберите действие:</b>",
+                reply_markup=BotKeyboards.calendar_menu(user_id, new_state),
+                parse_mode="HTML"
+            )
+    else:
+        # Просто обновляем меню
+        await callback.message.edit_text(
+            f"📅 <b>Календарь</b>\n\n"
+            f"📊 <b>Статус:</b> {status}\n"
+            f"🔄 <b>Автосинхронизация:</b> {sync_status}\n\n"
+            "🎯 <b>Возможности:</b>\n"
+            "• Создание событий голосом\n"
+            "• Умные напоминания\n"
+            "• Анализ расписания\n"
+            "• Планирование встреч\n\n"
+            "📌 <b>Выберите действие:</b>",
+            reply_markup=BotKeyboards.calendar_menu(user_id, new_state),
+            parse_mode="HTML"
+        )
+    
+    await callback.answer()
+
 @router.callback_query(F.data == "calendar_sync_reminders")
 async def calendar_sync_reminders_handler(callback: CallbackQuery):
-    """Синхронизировать календарь с напоминаниями"""
+    """Синхронизировать календарь с напоминаниями (старый обработчик для совместимости)"""
     user_id = callback.from_user.id
     
     # Инициализируем синхронизатор
@@ -2065,7 +2219,7 @@ async def calendar_sync_reminders_handler(callback: CallbackQuery):
                     "Теперь вы будете получать напоминания о событиях календаря за установленное время до начала.\n\n"
                     "⚙️ Настроить время предупреждения можно в разделе:\n"
                     "Меню → Напоминания → Настройки",
-                    reply_markup=keyboards.calendar_menu(),
+                    reply_markup=BotKeyboards.calendar_menu(),
                     parse_mode="HTML"
                 )
             else:
@@ -2076,7 +2230,7 @@ async def calendar_sync_reminders_handler(callback: CallbackQuery):
                     "• Все события уже прошли\n"
                     "• В календаре нет событий на ближайшие 30 дней\n"
                     "• События уже синхронизированы",
-                    reply_markup=keyboards.calendar_menu(),
+                    reply_markup=BotKeyboards.calendar_menu(),
                     parse_mode="HTML"
                 )
         
@@ -2096,8 +2250,252 @@ async def calendar_sync_reminders_handler(callback: CallbackQuery):
             "❌ <b>Критическая ошибка синхронизации</b>\n\n"
             "Произошла неожиданная ошибка.\n"
             "Попробуйте позже или обратитесь к администратору.",
-            reply_markup=keyboards.calendar_menu(),
+            reply_markup=BotKeyboards.calendar_menu(),
             parse_mode="HTML"
         )
     
     await callback.answer("Синхронизация завершена")
+
+# ===== ОБРАБОТЧИКИ СОБЫТИЙ КАЛЕНДАРЯ =====
+
+@router.callback_query(F.data.startswith("calendar_event_"))
+async def calendar_event_handler(callback: CallbackQuery):
+    """Обработчик клика по конкретному событию"""
+    try:
+        event_id = callback.data.replace("calendar_event_", "")
+        user_id = callback.from_user.id
+        
+        # Получаем данные события по ID
+        # Для простоты пока покажем меню действий
+        message_text = f"🗓️ <b>Управление событием</b>\n\n"
+        message_text += f"📋 <i>ID события:</i> {event_id}\n\n"
+        message_text += "Выберите действие:"
+        
+        await callback.message.edit_text(
+            message_text,
+            reply_markup=ReminderKeyboards.calendar_event_actions(event_id),
+            parse_mode="HTML"
+        )
+        
+    except Exception as e:
+        print(f"Ошибка обработки события: {e}")
+        await callback.answer("❌ Ошибка загрузки события")
+
+@router.callback_query(F.data.startswith("calendar_delete_"))
+async def calendar_delete_handler(callback: CallbackQuery):
+    """Обработчик удаления события"""
+    try:
+        event_id = callback.data.replace("calendar_delete_", "")
+        user_id = callback.from_user.id
+        
+        # Показываем подтверждение удаления
+        await callback.message.edit_text(
+            "🗑️ <b>Удаление события</b>\n\n"
+            "⚠️ <b>Вы уверены?</b>\n"
+            "Это действие нельзя отменить.\n\n"
+            f"📋 <i>ID события:</i> {event_id}",
+            reply_markup=create_delete_confirm_keyboard(event_id),
+            parse_mode="HTML"
+        )
+        
+    except Exception as e:
+        print(f"Ошибка подготовки удаления: {e}")
+        await callback.answer("❌ Ошибка")
+
+@router.callback_query(F.data.startswith("calendar_delete_confirm_"))
+async def calendar_delete_confirm_handler(callback: CallbackQuery):
+    """Подтверждение удаления события"""
+    try:
+        event_id = callback.data.replace("calendar_delete_confirm_", "")
+        user_id = callback.from_user.id
+        
+        # Показываем процесс удаления
+        await callback.message.edit_text(
+            "🗑️ <b>Удаление события...</b>\n\n"
+            "⏳ Пожалуйста, подождите...",
+            parse_mode="HTML"
+        )
+        
+        # Получаем данные календаря
+        token_data = await user_tokens.get_token_data(user_id, "calendar")
+        
+        if not token_data or not token_data.get("app_password"):
+            await callback.message.edit_text(
+                "❌ <b>Календарь не подключен</b>\n\n"
+                "Для удаления события необходимо подключить календарь.",
+                reply_markup=BotKeyboards.back_button("category_calendar"),
+                parse_mode="HTML"
+            )
+            return
+        
+        # Создаем клиент календаря
+        app_password = token_data["app_password"]
+        username = token_data.get("username") or token_data.get("email")
+        
+        calendar = YandexCalendar(app_password, username)
+        
+        # Удаляем событие из календаря
+        success = await calendar.delete_event(event_id)
+        
+        if success:
+            # Синхронно удаляем связанные напоминания
+            sync = CalendarReminderSync()
+            await sync.remove_event_reminders(user_id, event_id)
+            
+            await callback.message.edit_text(
+                "✅ <b>Событие удалено!</b>\n\n"
+                "Событие и связанные напоминания были успешно удалены.",
+                reply_markup=BotKeyboards.back_button("category_calendar"),
+                parse_mode="HTML"
+            )
+        else:
+            await callback.message.edit_text(
+                "❌ <b>Ошибка удаления</b>\n\n"
+                "Не удалось удалить событие из календаря.",
+                reply_markup=BotKeyboards.back_button("category_calendar"),
+                parse_mode="HTML"
+            )
+        
+    except Exception as e:
+        print(f"Ошибка удаления события: {e}")
+        await callback.message.edit_text(
+            "❌ <b>Ошибка удаления</b>\n\n"
+            "Не удалось удалить событие.\n"
+            "Попробуйте позже.",
+            reply_markup=ReminderKeyboards.calendar_event_actions(event_id),
+            parse_mode="HTML"
+        )
+
+@router.callback_query(F.data.startswith("delete_calendar_event_"))
+async def delete_calendar_event_from_reminder(callback: CallbackQuery):
+    """Удалить событие календаря из напоминания"""
+    user_id = callback.from_user.id
+    reminder_id = callback.data.replace("delete_calendar_event_", "")
+    
+    try:
+        # Получаем информацию о напоминании
+        from database.reminders import ReminderDB
+        reminder_db = ReminderDB()
+        reminder = await reminder_db.get_reminder(int(reminder_id))
+        
+        if not reminder:
+            await callback.answer("Напоминание не найдено", show_alert=True)
+            return
+        
+        # Получаем токен календаря
+        from utils.token_manager import token_manager
+        token_data = token_manager.get_token(user_id, "yandex_calendar")
+        
+        if not token_data:
+            await callback.message.edit_text(
+                "❌ <b>Календарь не подключен</b>\n\n"
+                "Невозможно удалить событие - нет доступа к календарю.",
+                reply_markup=ReminderKeyboards.back_to_reminders(),
+                parse_mode="HTML"
+            )
+            await callback.answer()
+            return
+        
+        # Ищем событие в календаре по названию напоминания
+        reminder_title = reminder.get('title', '').replace('📅 Скоро: ', '').replace('📅 ', '')
+        
+        # Получаем app_password и username
+        app_password = token_data.get("app_password")
+        username = token_data.get("username") or token_data.get("email")
+        
+        if not app_password or not username:
+            await callback.message.edit_text(
+                "❌ <b>Ошибка подключения</b>\n\n"
+                "Не найдены данные для подключения к календарю.",
+                reply_markup=ReminderKeyboards.back_to_reminders(),
+                parse_mode="HTML"
+            )
+            await callback.answer()
+            return
+        
+        # Создаем клиент календаря
+        calendar_client = YandexCalendar(app_password, username)
+        
+        # Получаем события календаря
+        from datetime import datetime, timedelta
+        start_date = datetime.now() - timedelta(days=7)  # Ищем в событиях последней недели
+        end_date = datetime.now() + timedelta(days=30)   # И на месяц вперед
+        
+        events = await calendar_client.get_events(
+            start_date.strftime('%Y-%m-%dT%H:%M:%S'),
+            end_date.strftime('%Y-%m-%dT%H:%M:%S')
+        )
+        
+        # Ищем событие по названию
+        found_event = None
+        for event in events or []:
+            event_title = event.get('summary', '')
+            if (reminder_title.lower() in event_title.lower() or 
+                event_title.lower() in reminder_title.lower()):
+                found_event = event
+                break
+        
+        if found_event:
+            event_id = found_event.get('id') or found_event.get('uid')
+            if event_id:
+                # Удаляем событие из календаря
+                delete_result = await calendar_client.delete_event(event_id)
+                
+                if delete_result:
+                    await callback.message.edit_text(
+                        "✅ <b>Событие удалено из календаря</b>\n\n"
+                        f"📅 Событие '{reminder_title}' было удалено из календаря.\n"
+                        "🔔 Напоминание уже удалено ранее.",
+                        reply_markup=ReminderKeyboards.back_to_reminders(),
+                        parse_mode="HTML"
+                    )
+                else:
+                    await callback.message.edit_text(
+                        "❌ <b>Ошибка удаления из календаря</b>\n\n"
+                        "Не удалось удалить событие из календаря.\n"
+                        "🔔 Напоминание уже удалено.",
+                        reply_markup=ReminderKeyboards.back_to_reminders(),
+                        parse_mode="HTML"
+                    )
+            else:
+                await callback.message.edit_text(
+                    "❌ <b>Событие не найдено</b>\n\n"
+                    "Не удалось найти ID события для удаления.",
+                    reply_markup=ReminderKeyboards.back_to_reminders(),
+                    parse_mode="HTML"
+                )
+        else:
+            await callback.message.edit_text(
+                "🔍 <b>Событие не найдено</b>\n\n"
+                f"Не удалось найти событие '{reminder_title}' в календаре.\n"
+                "Возможно, оно уже было удалено.",
+                reply_markup=ReminderKeyboards.back_to_reminders(),
+                parse_mode="HTML"
+            )
+        
+        await callback.answer()
+        
+    except Exception as e:
+        print(f"Ошибка удаления события календаря: {e}")
+        await callback.message.edit_text(
+            "❌ <b>Ошибка</b>\n\n"
+            "Произошла ошибка при удалении события из календаря.",
+            reply_markup=ReminderKeyboards.back_to_reminders(),
+            parse_mode="HTML"
+        )
+        await callback.answer()
+
+def create_delete_confirm_keyboard(event_id: str):
+    """Создать клавиатуру подтверждения удаления"""
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+    
+    builder = InlineKeyboardBuilder()
+    
+    builder.add(
+        InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"calendar_delete_confirm_{event_id}"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data=f"calendar_event_{event_id}")
+    )
+    
+    builder.adjust(2)
+    return builder.as_markup()

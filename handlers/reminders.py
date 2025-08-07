@@ -12,6 +12,8 @@ import logging
 from typing import Optional
 from database.reminders import ReminderDB
 from utils.keyboards import ReminderKeyboards
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 
@@ -404,17 +406,40 @@ async def view_reminder(callback: CallbackQuery):
 async def delete_reminder(callback: CallbackQuery):
     """Удаление напоминания"""
     reminder_id = int(callback.data.replace("reminder_delete_", ""))
+    user_id = callback.from_user.id
     
-    success = await reminder_db.delete_reminder(reminder_id)
-    
-    if success:
-        await callback.message.edit_text(
-            "✅ <b>Напоминание удалено</b>",
-            reply_markup=keyboards.back_to_reminders(),
-            parse_mode="HTML"
-        )
-        await callback.answer("Удалено")
-    else:
+    try:
+        # Получаем информацию о напоминании перед удалением
+        reminder = await reminder_db.get_reminder(reminder_id)
+        
+        # Удаляем напоминание
+        success = await reminder_db.delete_reminder(reminder_id)
+        
+        if success:
+            # Если это напоминание из календаря, предлагаем удалить и событие
+            if reminder and reminder.get('title', '').startswith('📅'):
+                await callback.message.edit_text(
+                    "✅ <b>Напоминание удалено</b>\n\n"
+                    "🗓️ Это напоминание было создано из события календаря.\n"
+                    "Хотите также удалить событие из календаря?",
+                    reply_markup=InlineKeyboardBuilder().add(
+                        InlineKeyboardButton(text="🗑️ Да, удалить событие", callback_data=f"delete_calendar_event_{reminder_id}"),
+                        InlineKeyboardButton(text="🔙 Нет, только напоминание", callback_data="reminder_list")
+                    ).adjust(1).as_markup(),
+                    parse_mode="HTML"
+                )
+            else:
+                await callback.message.edit_text(
+                    "✅ <b>Напоминание удалено</b>",
+                    reply_markup=ReminderKeyboards.back_to_reminders(),
+                    parse_mode="HTML"
+                )
+            await callback.answer("Удалено")
+        else:
+            await callback.answer("Ошибка удаления", show_alert=True)
+            
+    except Exception as e:
+        print(f"Ошибка удаления напоминания: {e}")
         await callback.answer("Ошибка удаления", show_alert=True)
 
 @router.callback_query(F.data.startswith("reminder_complete_"))
@@ -497,22 +522,52 @@ async def show_reminder_settings(callback: CallbackQuery):
     """Показать настройки напоминаний"""
     user_id = callback.from_user.id
     
-    settings = await reminder_db.get_user_settings(user_id)
-    
-    text = "⚙️ <b>Настройки напоминаний</b>\n\n"
-    text += f"🔔 Напоминания: {'✅ Включены' if settings.get('enabled', True) else '❌ Выключены'}\n"
-    text += f"🔊 Звук: {'✅ Включен' if settings.get('sound_enabled', True) else '❌ Выключен'}\n"
-    text += f"⏰ Время по умолчанию: {settings.get('default_notification_time', '09:00')}\n"
-    text += f"🌍 Часовой пояс: {settings.get('timezone', 'Europe/Moscow')}\n"
-    text += f"⏱️ Предупреждать за: {settings.get('advance_notification', 10)} минут\n"
-    text += f"📋 Ежедневная сводка: {'✅ Включена' if settings.get('daily_summary', False) else '❌ Выключена'}\n"
-    
-    await callback.message.edit_text(
-        text,
-        reply_markup=keyboards.settings_menu(settings),
-        parse_mode="HTML"
-    )
-    await callback.answer()
+    try:
+        # Используем новую систему настроек
+        from utils.user_settings import user_settings
+        user_settings_data = user_settings.get_user_settings(user_id)
+        settings = user_settings_data.get('reminders', {})
+        
+        text = "⚙️ <b>Настройки напоминаний</b>\n\n"
+        text += f"🔔 Напоминания: {'✅ Включены' if settings.get('enabled', True) else '❌ Выключены'}\n"
+        text += f"🔊 Звук: {'✅ Включен' if settings.get('sound_enabled', True) else '❌ Выключен'}\n"
+        text += f"📅 В момент события: {'✅ Включено' if settings.get('notify_at_event', False) else '❌ Выключено'}\n"
+        
+        # Часовой пояс
+        timezone = settings.get('timezone', 'Europe/Moscow')
+        tz_display = timezone.replace('Europe/', '').replace('Asia/', '').replace('_', ' ')
+        text += f"🌍 Часовой пояс: {tz_display}\n"
+        
+        # Время предупреждения  
+        advance_time = settings.get('advance_time', 15)
+        text += f"⏱️ Предупреждать за: {advance_time} минут\n"
+        
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboards.settings_menu(settings),
+            parse_mode="HTML"
+        )
+        await callback.answer()
+        
+    except Exception as e:
+        print(f"Error showing reminder settings: {e}")
+        # Fallback на старую систему
+        settings = await reminder_db.get_user_settings(user_id)
+        
+        text = "⚙️ <b>Настройки напоминаний</b>\n\n"
+        text += f"🔔 Напоминания: {'✅ Включены' if settings.get('enabled', True) else '❌ Выключены'}\n"
+        text += f"🔊 Звук: {'✅ Включен' if settings.get('sound_enabled', True) else '❌ Выключен'}\n"
+        text += f"⏰ Время по умолчанию: {settings.get('default_notification_time', '09:00')}\n"
+        text += f"🌍 Часовой пояс: {settings.get('timezone', 'Europe/Moscow')}\n"
+        text += f"⏱️ Предупреждать за: {settings.get('advance_notification', 10)} минут\n"
+        text += f"📋 Ежедневная сводка: {'✅ Включена' if settings.get('daily_summary', False) else '❌ Выключена'}\n"
+        
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboards.settings_menu(settings),
+            parse_mode="HTML"
+        )
+        await callback.answer()
 
 @router.callback_query(F.data.startswith("setting_toggle_"))
 async def toggle_setting(callback: CallbackQuery):
@@ -520,13 +575,67 @@ async def toggle_setting(callback: CallbackQuery):
     setting = callback.data.replace("setting_toggle_", "")
     user_id = callback.from_user.id
     
-    success = await reminder_db.toggle_setting(user_id, setting)
-    
-    if success:
+    try:
+        # Используем новую систему настроек
+        from utils.user_settings import user_settings
+        
+        # Маппинг настроек
+        setting_map = {
+            "enabled": "reminders.enabled",
+            "sound_enabled": "reminders.sound_enabled", 
+            "notify_at_event": "reminders.notify_at_event",
+            "daily_summary": "reminders.daily_summary"
+        }
+        
+        if setting in setting_map:
+            # Переключаем настройку в новой системе
+            new_value = user_settings.toggle_setting(user_id, setting_map[setting])
+            await callback.answer(f"Настройка {'включена' if new_value else 'выключена'}")
+        else:
+            # Fallback на старую систему для совместимости
+            success = await reminder_db.toggle_setting(user_id, setting)
+            if not success:
+                await callback.answer("Ошибка изменения настройки", show_alert=True)
+                return
+        
         # Обновляем отображение настроек
         await show_reminder_settings(callback)
-    else:
+        
+    except Exception as e:
+        print(f"Error toggling setting {setting}: {e}")
         await callback.answer("Ошибка изменения настройки", show_alert=True)
+
+@router.callback_query(F.data == "setting_timezone")
+async def show_timezone_menu(callback: CallbackQuery):
+    """Показать меню выбора часового пояса"""
+    await callback.message.edit_text(
+        "🕐 <b>Выбор часового пояса</b>\n\n"
+        "Выберите ваш часовой пояс из списка:",
+        reply_markup=ReminderKeyboards.timezone_menu(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("tz_"))
+async def set_timezone(callback: CallbackQuery):
+    """Установить часовой пояс"""
+    timezone = callback.data.replace("tz_", "")
+    user_id = callback.from_user.id
+    
+    try:
+        from utils.user_settings import user_settings
+        user_settings.update_setting(user_id, "reminders.timezone", timezone)
+        
+        # Получаем красивое название
+        tz_display = timezone.replace('Europe/', '').replace('Asia/', '').replace('_', ' ')
+        await callback.answer(f"Часовой пояс изменен на {tz_display}")
+        
+        # Возвращаемся к настройкам
+        await show_reminder_settings(callback)
+        
+    except Exception as e:
+        print(f"Error setting timezone: {e}")
+        await callback.answer("Ошибка изменения часового пояса", show_alert=True)
 
 @router.callback_query(F.data == "setting_notification_time")
 async def set_notification_time(callback: CallbackQuery, state: FSMContext):

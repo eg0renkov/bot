@@ -18,6 +18,11 @@ async def extract_email_info_fixed(text: str, user_name: str = None) -> Optional
     
     # Расширенные паттерны с лучшей обработкой
     patterns = [
+        # НОВЫЕ ПАТТЕРНЫ ДЛЯ ИМЕН (БЕЗ EMAIL)
+        r"напиш[иь].*письмо\s+([а-яёА-ЯЁa-zA-Z]+(?:у)?)\s+с\s+(.+)",
+        r"отправ[ьи].*письмо\s+([а-яёА-ЯЁa-zA-Z]+(?:у)?)\s+с\s+(.+)",
+        r"письмо\s+([а-яёА-ЯЁa-zA-Z]+(?:у)?)\s+с\s+(.+)",
+        
         # Основные паттерны с "об" и "о" - ИСПРАВЛЕНЫ для лучшего захвата
         r"отправ[ьи].*письмо\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\s+об?\s+(.+)",
         r"отправ[ьи]\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\s+об?\s+(.+)",
@@ -40,13 +45,27 @@ async def extract_email_info_fixed(text: str, user_name: str = None) -> Optional
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             print(f"Pattern {i+1} MATCHED!")
-            email = match.group(1).strip()
+            recipient = match.group(1).strip()
             raw_subject = match.group(2).strip()
             
-            # Валидация email
-            if not _is_valid_email(email):
-                print(f"Invalid email: {email}")
-                continue
+            # Проверяем, является ли получатель email-адресом или именем
+            if _is_valid_email(recipient):
+                # Это email-адрес
+                email = recipient
+                print(f"Found email address: {email}")
+            else:
+                # Это имя - нужно искать в контактах
+                print(f"Found name: {recipient}, searching in contacts...")
+                try:
+                    email = await _find_email_by_name(recipient)
+                    print(f"Search result for {recipient}: {email}")
+                    if not email:
+                        print(f"Email not found for name: {recipient}")
+                        continue
+                    print(f"Found email for {recipient}: {email}")
+                except Exception as e:
+                    print(f"Error searching for {recipient}: {e}")
+                    continue
             
             # Валидация темы - не должна быть пустой или слишком короткой
             if not raw_subject or len(raw_subject.strip()) < 2:
@@ -162,8 +181,8 @@ def _generate_email_body(subject: str, additional_text: str, user_name: str = No
     
     # КРИТИЧЕСКИ ВАЖНО: Проверяем что тело не пустое
     if not body or len(body.strip()) < 10:
-        # Аварийный fallback
-        body = f"Добрый день!\n\nПишу вам по поводу: {subject}\n\nС уважением"
+        # Аварийный fallback БЕЗ async вызова
+        body = f"Добрый день!\n\nОбращаюсь к вам с вопросом.\n\nС уважением"
     
     return body
 
@@ -220,3 +239,73 @@ async def format_email_subject_safe(raw_subject: str) -> str:
     
     # Fallback - возвращаем очищенную тему
     return subject
+
+async def _find_email_by_name(name: str) -> str:
+    """Поиск email-адреса по имени в контактах"""
+    try:
+        # ВРЕМЕННАЯ ЗАГЛУШКА - добавим простой список контактов
+        # TODO: заменить на реальную базу данных контактов
+        test_contacts = {
+            'леонид': 'egrn0103@yandex.ru',
+            'леониду': 'egrn0103@yandex.ru',
+            'leonid': 'egrn0103@yandex.ru',
+        }
+        
+        name_lower = name.lower().strip()
+        print(f"Searching for name: '{name_lower}' in contacts: {list(test_contacts.keys())}")
+        
+        if name_lower in test_contacts:
+            email = test_contacts[name_lower]
+            print(f"Found email in test contacts: {email}")
+            return email
+        
+        # Поиск частичного совпадения
+        for contact_name, email in test_contacts.items():
+            if contact_name in name_lower or name_lower in contact_name:
+                print(f"Found partial match: {contact_name} -> {email}")
+                return email
+                
+        print(f"No contacts found for: {name_lower}")
+        return None
+                    
+    except Exception as e:
+        print(f"Error searching contacts: {e}")
+        return None
+
+async def _generate_ai_email_body(subject: str, user_name: str = None) -> str:
+    """Генерация грамматически правильного тела письма с помощью AI"""
+    try:
+        from utils.openai_client import openai_client
+        
+        signature = f"С уважением,\n{user_name}" if user_name else "С уважением"
+        
+        prompt = f"""Создай краткое и вежливое деловое письмо на русском языке по теме: "{subject}"
+
+ТРЕБОВАНИЯ:
+1. Начни с приветствия "Добрый день!"
+2. Используй правильную грамматику и падежи
+3. Письмо должно быть вежливым и деловым
+4. Длина 2-4 предложения
+5. НЕ добавляй подпись - она будет добавлена отдельно
+
+Пример структуры:
+Добрый день!
+
+[1-2 предложения по теме с правильной грамматикой]
+
+[Опционально: просьба или предложение]"""
+
+        messages = [
+            {"role": "system", "content": "Ты - помощник для создания деловых писем. Создавай грамматически правильные и вежливые письма."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        ai_body = await openai_client.chat_completion(messages)
+        
+        if ai_body and len(ai_body.strip()) > 10:
+            return f"{ai_body.strip()}\n\n{signature}"
+            
+    except Exception as e:
+        print(f"AI generation failed: {e}")
+    
+    return None
