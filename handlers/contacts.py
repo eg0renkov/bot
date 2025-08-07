@@ -42,12 +42,11 @@ def create_contact_actions_menu(contact_id: str):
     builder.add(
         InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"contact_edit_{contact_id}"),
         InlineKeyboardButton(text="📧 Написать письмо", callback_data=f"contact_email_{contact_id}"),
-        InlineKeyboardButton(text="📱 Позвонить", callback_data=f"contact_call_{contact_id}"),
         InlineKeyboardButton(text="📲 Telegram", callback_data=f"contact_telegram_{contact_id}"),
         InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"contact_delete_{contact_id}"),
         InlineKeyboardButton(text="◀️ К списку", callback_data="contacts_list")
     )
-    builder.adjust(2, 2, 1, 1)
+    builder.adjust(2, 1, 1, 1)
     return builder.as_markup()
 
 def create_cancel_button():
@@ -755,38 +754,6 @@ async def contact_send_email(callback: CallbackQuery):
     )
     await callback.answer()
 
-@router.callback_query(F.data.startswith("contact_call_"))
-async def contact_call(callback: CallbackQuery):
-    """Позвонить контакту"""
-    contact_id = callback.data.split("_")[-1]
-    user_id = callback.from_user.id
-    
-    contact = await contacts_manager.find_contact(user_id, contact_id)
-    if not contact:
-        await callback.answer("❌ Контакт не найден", show_alert=True)
-        return
-    
-    print(f"DEBUG: Contact call - contact_id: {contact_id}, name: '{contact.name}', phone: '{contact.phone}', phone type: {type(contact.phone)}")
-    
-    if not contact.phone:
-        await callback.answer("❌ У контакта нет номера телефона", show_alert=True)
-        return
-    
-    builder = InlineKeyboardBuilder()
-    builder.add(
-        InlineKeyboardButton(text="◀️ Назад", callback_data=f"contact_view_{contact_id}")
-    )
-    builder.adjust(1, 1)
-    
-    await callback.message.edit_text(
-        f"📞 <b>Звонок контакту</b>\n\n"
-        f"👤 <b>Имя:</b> {contact.name}\n"
-        f"📱 <b>Телефон:</b> <code>{contact.phone}</code>\n\n"
-        f"💡 <i>Нажмите на номер телефона чтобы скопировать</i>",
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML"
-    )
-    await callback.answer()
 
 @router.callback_query(F.data.startswith("contact_telegram_"))
 async def contact_telegram(callback: CallbackQuery):
