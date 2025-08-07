@@ -595,10 +595,16 @@ async def email_setup_edit(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "email_setup_cancel")
 async def email_setup_cancel(callback: CallbackQuery, state: FSMContext):
     """Отменить настройку"""
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    
+    back_keyboard = InlineKeyboardBuilder()
+    back_keyboard.add(InlineKeyboardButton(text="◀️ Назад в меню", callback_data="menu_back"))
+    
     await callback.message.edit_text(
         "❌ <b>Настройка отменена</b>\n\n"
         "💡 Вы можете начать настройку заново в любое время через меню\n"
         "\"📧 Подключить Почту\"",
+        reply_markup=back_keyboard.as_markup(),
         parse_mode="HTML"
     )
     

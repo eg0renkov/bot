@@ -1339,10 +1339,16 @@ async def calendar_setup_edit_password(callback: CallbackQuery, state: FSMContex
 @router.callback_query(F.data == "calendar_setup_cancel")
 async def calendar_setup_cancel(callback: CallbackQuery, state: FSMContext):
     """Отмена настройки"""
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    
+    back_keyboard = InlineKeyboardBuilder()
+    back_keyboard.add(InlineKeyboardButton(text="◀️ Назад в меню", callback_data="menu_back"))
+    
     await callback.message.edit_text(
-        "❌ <b>Настройка отменена</b>\n\n"
-        "🔙 Вы можете попробовать позже или обратиться за помощью.",
-        reply_markup=create_calendar_setup_menu(),
+        "❌ <b>Настройка календаря отменена</b>\n\n"
+        "💡 Вы можете начать настройку заново в любое время через меню\n"
+        "\"📅 Подключить Календарь\"",
+        reply_markup=back_keyboard.as_markup(),
         parse_mode="HTML"
     )
     
