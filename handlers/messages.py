@@ -245,14 +245,18 @@ async def extract_email_info(text: str, user_name: str = None) -> dict:
 async def extract_calendar_command(text: str) -> dict:
     """Извлечь команду создания события календаря"""
     text_lower = text.lower()
+    print(f"DEBUG extract_calendar_command: text='{text}', text_lower='{text_lower}'")
     
     # Проверяем что это НЕ email команда (содержит @ символ)
     if '@' in text:
+        print("DEBUG: Rejected - contains @ symbol")
         return None
     
     # ВАЖНО: Проверяем что это НЕ команда контакта
     contact_exclusions = ['контакт', 'номер', 'телефон', '+7', '+3', '+8', '+9']
-    if any(exclusion in text_lower for exclusion in contact_exclusions):
+    found_exclusions = [ex for ex in contact_exclusions if ex in text_lower]
+    if found_exclusions:
+        print(f"DEBUG: Rejected - found contact exclusions: {found_exclusions}")
         return None
     
     calendar_patterns = [
@@ -871,7 +875,9 @@ async def handle_text_message(message: Message):
             user_name += f" {message.from_user.last_name}"
         
         # Проверяем, является ли это командой создания события календаря (ПРИОРИТЕТ!)
+        print(f"DEBUG: Checking calendar command for: '{user_message}'")
         calendar_command = await extract_calendar_command(user_message)
+        print(f"DEBUG: Calendar command result: {calendar_command}")
         
         # Проверяем, является ли это командой отправки письма (ПРИОРИТЕТ НАД РЕДАКТИРОВАНИЕМ!)
         print(f"DEBUG: Checking for email command in text: '{user_message}'")
