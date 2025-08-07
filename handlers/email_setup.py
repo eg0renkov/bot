@@ -43,12 +43,13 @@ def create_fresh_setup_menu():
     """Создает свежее главное меню настройки"""
     builder = InlineKeyboardBuilder()
     builder.add(
-        InlineKeyboardButton(text="📧 Подключить Яндекс.Почту", callback_data="email_setup_start"),
+        InlineKeyboardButton(text="🚀 Подключить Яндекс.Почту", callback_data="email_setup_start"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
         InlineKeyboardButton(text="🔑 Что такое пароль приложения?", callback_data="email_setup_help"),
         InlineKeyboardButton(text="✅ Проверить подключение", callback_data="email_setup_check"),
         InlineKeyboardButton(text="◀️ Назад в меню", callback_data="menu_back")
     )
-    builder.adjust(1, 1, 1, 1)
+    builder.adjust(1, 1, 1, 1, 1)
     return builder.as_markup()
 
 def create_fresh_confirmation_menu():
@@ -119,20 +120,23 @@ async def start_email_setup(callback: CallbackQuery):
 @router.callback_query(F.data == "email_setup_start")
 async def email_setup_step1(callback: CallbackQuery, state: FSMContext):
     """Шаг 1: Ввод email"""
-    cancel_keyboard = InlineKeyboardBuilder()
-    cancel_keyboard.add(InlineKeyboardButton(text="❌ Отменить настройку", callback_data="email_setup_cancel"))
+    navigation_keyboard = InlineKeyboardBuilder()
+    navigation_keyboard.add(
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+        InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_mail"),
+        InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
+    )
+    navigation_keyboard.adjust(1, 2)
     
     await callback.message.edit_text(
         "📧 <b>Шаг 1 из 3: Ваш email</b>\n\n"
         "📝 Введите ваш email от Яндекс:\n"
         "(например: your_name@yandex.ru)\n\n"
-        "⚠️ <b>Важно:</b> Поддерживаются только адреса:\n"
-        "• @yandex.ru\n"
-        "• @yandex.com\n"
-        "• @ya.ru\n"
-        "• @narod.ru\n\n"
+        "⚠️ <b>Поддерживаются только адреса:</b>\n"
+        "• @yandex.ru • @yandex.com • @ya.ru • @narod.ru\n\n"
+        "📚 <b>Нужна помощь?</b> Нажмите \"Подробная инструкция\"\n\n"
         "✏️ <i>Напишите ваш email в следующем сообщении</i>",
-        reply_markup=cancel_keyboard.as_markup(),
+        reply_markup=navigation_keyboard.as_markup(),
         parse_mode="HTML"
     )
     
@@ -142,25 +146,28 @@ async def email_setup_step1(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "email_setup_help")
 async def email_setup_help(callback: CallbackQuery):
     """Справка по паролю приложения"""
+    help_keyboard = InlineKeyboardBuilder()
+    help_keyboard.add(
+        InlineKeyboardButton(text="📘 Подробная инструкция с картинками", url="https://teletype.in/@your_bot/email_setup"),
+        InlineKeyboardButton(text="🚀 Продолжить настройку", callback_data="email_setup_start"),
+        InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_mail")
+    )
+    help_keyboard.adjust(1, 2)
+    
     await callback.message.edit_text(
-        "🔑 <b>Что такое пароль приложения?</b>\n\n"
-        "📱 <b>Пароль приложения</b> - это специальный пароль для использования "
-        "почты Яндекс в сторонних приложениях (как наш бот).\n\n"
-        "🛡️ <b>Это безопасно:</b>\n"
-        "• Отдельный пароль только для бота\n"
-        "• Можно отозвать в любой момент\n"
-        "• Не даёт доступ к основному аккаунту\n\n"
-        "📋 <b>Как получить пароль приложения:</b>\n\n"
-        "1️⃣ Зайдите на <b>id.yandex.ru</b>\n"
-        "2️⃣ Перейдите в <b>\"Безопасность\"</b>\n"
-        "3️⃣ Включите <b>\"Двухфакторную аутентификацию\"</b> (если ещё не включена)\n"
-        "4️⃣ Найдите <b>\"Пароли приложений\"</b>\n"
-        "5️⃣ Нажмите <b>\"Создать пароль\"</b>\n"
-        "6️⃣ Введите название: <b>\"Telegram Bot\"</b>\n"
-        "7️⃣ Скопируйте полученный пароль\n\n"
-        "💡 <b>Пароль выглядит так:</b> <code>abcdabcdabcdabcd</code>\n\n"
-        "❓ <b>Нужна помощь?</b> Напишите \"помощь с настройкой почты\"",
-        reply_markup=setup_wizard.get_setup_menu(),
+        "🔑 <b>Пароль приложения - что это?</b>\n\n"
+        "🤖 Это специальный пароль для подключения почты к боту.\n"
+        "🛡️ <b>Безопасно:</b> отдельный от основного пароля, можно отозвать.\n\n"
+        "🚀 <b>Быстрое создание (3 минуты):</b>\n\n"
+        "1️⃣ Откройте <code>id.yandex.ru</code>\n"
+        "2️⃣ Войдите в аккаунт → Безопасность\n"
+        "3️⃣ Включите 2FA (если не включена)\n"
+        "4️⃣ Пароли приложений → Создать\n"
+        "5️⃣ Название: \"Telegram Bot\"\n"
+        "6️⃣ Скопируйте пароль в бот\n\n"
+        "💡 <b>Пароль:</b> 16 символов, например <code>abcd1234abcd1234</code>\n\n"
+        "📚 <b>Нужна помощь?</b> Посмотрите подробную инструкцию с картинками!",
+        reply_markup=help_keyboard.as_markup(),
         parse_mode="HTML"
     )
     await callback.answer()
@@ -233,24 +240,27 @@ async def email_setup_step2_email(message: Message, state: FSMContext):
     # Сохраняем email в состояние
     await state.update_data(email=email)
     
-    cancel_keyboard = InlineKeyboardBuilder()
-    cancel_keyboard.add(InlineKeyboardButton(text="❌ Отменить настройку", callback_data="email_setup_cancel"))
+    navigation_keyboard = InlineKeyboardBuilder()
+    navigation_keyboard.add(
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+        InlineKeyboardButton(text="◀️ Изменить email", callback_data="email_setup_edit_email"),
+        InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
+    )
+    navigation_keyboard.adjust(1, 2)
     
     await message.answer(
         "✅ <b>Email принят!</b>\n\n"
         f"📧 <b>Ваш email:</b> {email}\n\n"
         "🔑 <b>Шаг 2 из 3: Пароль приложения</b>\n\n"
-        "📋 <b>Если у вас уже есть пароль приложения:</b>\n"
-        "Введите его в следующем сообщении\n\n"
-        "🆘 <b>Если пароля нет:</b>\n"
-        "1. Зайдите на <b>id.yandex.ru</b>\n"
-        "2. Перейдите в <b>\"Безопасность\"</b>\n"
-        "3. Включите <b>\"Двухфакторную аутентификацию\"</b>\n"
-        "4. Создайте <b>\"Пароль приложения\"</b>\n"
-        "5. Введите название: <b>\"Telegram Bot\"</b>\n"
-        "6. Скопируйте пароль и введите здесь\n\n"
-        "🔐 <i>Введите пароль приложения:</i>",
-        reply_markup=cancel_keyboard.as_markup(),
+        "📋 <b>Что такое пароль приложения?</b>\n"
+        "Это специальный пароль для безопасного подключения почты к боту.\n\n"
+        "🚀 <b>Как получить:</b>\n"
+        "1. Откройте <code>id.yandex.ru</code>\n"
+        "2. Безопасность → Пароли приложений\n"
+        "3. Создайте пароль для \"Telegram Bot\"\n\n"
+        "📚 <b>Подробная инструкция</b> с картинками доступна по кнопке выше\n\n"
+        "🔐 <i>Введите пароль приложения в следующем сообщении:</i>",
+        reply_markup=navigation_keyboard.as_markup(),
         parse_mode="HTML"
     )
     
@@ -299,15 +309,26 @@ async def email_setup_step3_password(message: Message, state: FSMContext):
     # Показываем подтверждение
     masked_password = password[:4] + '••••••••••••'
     
+    confirmation_keyboard = InlineKeyboardBuilder()
+    confirmation_keyboard.add(
+        InlineKeyboardButton(text="✅ Подключить почту", callback_data="email_setup_save"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+        InlineKeyboardButton(text="✏️ Изменить email", callback_data="email_setup_edit_email"),
+        InlineKeyboardButton(text="🔑 Изменить пароль", callback_data="email_setup_edit_password"),
+        InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
+    )
+    confirmation_keyboard.adjust(1, 1, 2, 1)
+    
     await message.answer(
         "🔍 <b>Шаг 3 из 3: Подтверждение</b>\n\n"
         f"📧 <b>Email:</b> {escape_email(email)}\n"
         f"🔐 <b>Пароль:</b> {masked_password}\n"
         f"🌐 <b>Сервер:</b> smtp.yandex.ru:587\n\n"
-        "⚡ <b>Всё готово для подключения!</b>\n\n"
-        "✅ Нажмите <b>\"Сохранить настройки\"</b> для завершения\n"
-        "✏️ Или измените данные если нужно",
-        reply_markup=create_fresh_confirmation_menu(),
+        "⚡ <b>Готово к подключению!</b>\n\n"
+        "✅ Нажмите <b>\"Подключить почту\"</b> для завершения\n"
+        "✏️ Или измените данные при необходимости\n\n"
+        "📚 <b>Возникли проблемы?</b> Посмотрите подробную инструкцию",
+        reply_markup=confirmation_keyboard.as_markup(),
         parse_mode="HTML"
     )
     
@@ -529,17 +550,42 @@ async def email_setup_edit(callback: CallbackQuery, state: FSMContext):
     edit_type = callback.data.split("_")[-1]
     
     if edit_type == "email":
+        navigation_keyboard = InlineKeyboardBuilder()
+        navigation_keyboard.add(
+            InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+            InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_mail"),
+            InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
+        )
+        navigation_keyboard.adjust(1, 2)
+        
         await callback.message.edit_text(
             "✏️ <b>Изменить email</b>\n\n"
-            "📝 Введите новый email от Яндекс:",
+            "📝 Введите новый email от Яндекс:\n"
+            "(например: your_name@yandex.ru)\n\n"
+            "⚠️ <b>Поддерживаются только адреса:</b>\n"
+            "• @yandex.ru • @yandex.com • @ya.ru • @narod.ru",
+            reply_markup=navigation_keyboard.as_markup(),
             parse_mode="HTML"
         )
         await state.set_state(EmailSetupStates.waiting_for_email)
     
     elif edit_type == "password":
+        navigation_keyboard = InlineKeyboardBuilder()
+        navigation_keyboard.add(
+            InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+            InlineKeyboardButton(text="◀️ Изменить email", callback_data="email_setup_edit_email"),
+            InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
+        )
+        navigation_keyboard.adjust(1, 2)
+        
         await callback.message.edit_text(
             "🔑 <b>Изменить пароль приложения</b>\n\n"
-            "🔐 Введите новый пароль приложения:",
+            "🔐 Введите новый пароль приложения:\n\n"
+            "💡 <b>Где получить:</b>\n"
+            "1. <code>id.yandex.ru</code> → Безопасность\n"
+            "2. Создайте пароль для \"Telegram Bot\"\n\n"
+            "📚 Подробная инструкция доступна по кнопке выше",
+            reply_markup=navigation_keyboard.as_markup(),
             parse_mode="HTML"
         )
         await state.set_state(EmailSetupStates.waiting_for_password)
