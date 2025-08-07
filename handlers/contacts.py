@@ -774,7 +774,6 @@ async def contact_call(callback: CallbackQuery):
     
     builder = InlineKeyboardBuilder()
     builder.add(
-        InlineKeyboardButton(text="📞 Позвонить", url=f"tel:{contact.phone}"),
         InlineKeyboardButton(text="◀️ Назад", callback_data=f"contact_view_{contact_id}")
     )
     builder.adjust(1, 1)
@@ -782,8 +781,8 @@ async def contact_call(callback: CallbackQuery):
     await callback.message.edit_text(
         f"📞 <b>Звонок контакту</b>\n\n"
         f"👤 <b>Имя:</b> {contact.name}\n"
-        f"📱 <b>Телефон:</b> {contact.phone}\n\n"
-        f"📞 Нажмите кнопку \"Позвонить\" чтобы совершить звонок",
+        f"📱 <b>Телефон:</b> <code>{contact.phone}</code>\n\n"
+        f"💡 <i>Нажмите на номер телефона чтобы скопировать</i>",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
