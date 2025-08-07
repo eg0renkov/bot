@@ -766,6 +766,8 @@ async def contact_call(callback: CallbackQuery):
         await callback.answer("❌ Контакт не найден", show_alert=True)
         return
     
+    print(f"DEBUG: Contact call - contact_id: {contact_id}, name: '{contact.name}', phone: '{contact.phone}', phone type: {type(contact.phone)}")
+    
     if not contact.phone:
         await callback.answer("❌ У контакта нет номера телефона", show_alert=True)
         return

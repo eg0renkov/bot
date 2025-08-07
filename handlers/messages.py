@@ -1460,6 +1460,7 @@ async def check_and_create_contact(message: Message, user_message: str, ai_respo
                         # Это номер телефона
                         phone = second_param.strip()
                         email = None
+                        print(f"DEBUG: Detected phone number: '{phone}'")
                     elif '@' in match.group(1):
                         # Email в первой группе, парсим по-другому
                         parts = match.group(1).strip().split()
@@ -1498,6 +1499,7 @@ async def check_and_create_contact(message: Message, user_message: str, ai_respo
                     elif phone_match:
                         phone = phone_match.group(1)
                         email = None
+                        print(f"DEBUG: Fallback detected phone: '{phone}'")
                         # Имя - это всё остальное
                         name = contact_text.replace(phone, '').strip()
                         # Убираем лишние символы
@@ -1689,6 +1691,8 @@ async def create_contact_from_text(message: Message, name: str, email: str, user
             phone=phone or '',
             notes=notes
         )
+        
+        print(f"DEBUG: Creating contact - name: '{name}', email: '{email}', phone: '{phone}'")
         
         # Добавляем контакт в базу
         success = await contacts_manager.add_contact(user_id, new_contact)
