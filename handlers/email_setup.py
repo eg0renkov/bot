@@ -44,7 +44,7 @@ def create_fresh_setup_menu():
     builder = InlineKeyboardBuilder()
     builder.add(
         InlineKeyboardButton(text="🚀 Подключить Яндекс.Почту", callback_data="email_setup_start"),
-        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
         InlineKeyboardButton(text="🔑 Что такое пароль приложения?", callback_data="email_setup_help"),
         InlineKeyboardButton(text="✅ Проверить подключение", callback_data="email_setup_check"),
         InlineKeyboardButton(text="◀️ Назад в меню", callback_data="menu_back")
@@ -122,7 +122,7 @@ async def email_setup_step1(callback: CallbackQuery, state: FSMContext):
     """Шаг 1: Ввод email"""
     navigation_keyboard = InlineKeyboardBuilder()
     navigation_keyboard.add(
-        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
         InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_mail"),
         InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
     )
@@ -148,7 +148,7 @@ async def email_setup_help(callback: CallbackQuery):
     """Справка по паролю приложения"""
     help_keyboard = InlineKeyboardBuilder()
     help_keyboard.add(
-        InlineKeyboardButton(text="📘 Подробная инструкция с картинками", url="https://teletype.in/@your_bot/email_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция с картинками", url="https://ya.ru"),
         InlineKeyboardButton(text="🚀 Продолжить настройку", callback_data="email_setup_start"),
         InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_mail")
     )
@@ -242,7 +242,7 @@ async def email_setup_step2_email(message: Message, state: FSMContext):
     
     navigation_keyboard = InlineKeyboardBuilder()
     navigation_keyboard.add(
-        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
         InlineKeyboardButton(text="◀️ Изменить email", callback_data="email_setup_edit_email"),
         InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
     )
@@ -312,7 +312,7 @@ async def email_setup_step3_password(message: Message, state: FSMContext):
     confirmation_keyboard = InlineKeyboardBuilder()
     confirmation_keyboard.add(
         InlineKeyboardButton(text="✅ Подключить почту", callback_data="email_setup_save"),
-        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
         InlineKeyboardButton(text="✏️ Изменить email", callback_data="email_setup_edit_email"),
         InlineKeyboardButton(text="🔑 Изменить пароль", callback_data="email_setup_edit_password"),
         InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
@@ -552,7 +552,7 @@ async def email_setup_edit(callback: CallbackQuery, state: FSMContext):
     if edit_type == "email":
         navigation_keyboard = InlineKeyboardBuilder()
         navigation_keyboard.add(
-            InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+            InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
             InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_mail"),
             InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
         )
@@ -572,7 +572,7 @@ async def email_setup_edit(callback: CallbackQuery, state: FSMContext):
     elif edit_type == "password":
         navigation_keyboard = InlineKeyboardBuilder()
         navigation_keyboard.add(
-            InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/email_setup"),
+            InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
             InlineKeyboardButton(text="◀️ Изменить email", callback_data="email_setup_edit_email"),
             InlineKeyboardButton(text="❌ Отменить", callback_data="email_setup_cancel")
         )

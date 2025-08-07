@@ -924,7 +924,7 @@ def create_calendar_setup_menu():
     builder = InlineKeyboardBuilder()
     builder.add(
         InlineKeyboardButton(text="🚀 Подключить календарь", callback_data="calendar_setup_start"),
-        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
         InlineKeyboardButton(text="🔑 Что такое пароль приложения?", callback_data="calendar_setup_help"),
         InlineKeyboardButton(text="✅ Проверить подключение", callback_data="calendar_setup_check"),
         InlineKeyboardButton(text="◀️ Назад в меню", callback_data="menu_back")
@@ -989,7 +989,7 @@ async def calendar_setup_step1(callback: CallbackQuery, state: FSMContext):
     
     navigation_keyboard = InlineKeyboardBuilder()
     navigation_keyboard.add(
-        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
         InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_calendar"),
         InlineKeyboardButton(text="❌ Отменить", callback_data="calendar_setup_cancel")
     )
@@ -1017,7 +1017,7 @@ async def calendar_setup_help(callback: CallbackQuery):
     
     help_keyboard = InlineKeyboardBuilder()
     help_keyboard.add(
-        InlineKeyboardButton(text="📘 Подробная инструкция с картинками", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция с картинками", url="https://ya.ru"),
         InlineKeyboardButton(text="🚀 Продолжить настройку", callback_data="calendar_setup_start"),
         InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_calendar")
     )
@@ -1123,7 +1123,7 @@ async def calendar_setup_email_handler(message: Message, state: FSMContext):
     
     navigation_keyboard = InlineKeyboardBuilder()
     navigation_keyboard.add(
-        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
         InlineKeyboardButton(text="◀️ Изменить email", callback_data="calendar_setup_edit_email"),
         InlineKeyboardButton(text="❌ Отменить", callback_data="calendar_setup_cancel")
     )
@@ -1290,7 +1290,7 @@ async def calendar_setup_edit_email(callback: CallbackQuery, state: FSMContext):
     
     navigation_keyboard = InlineKeyboardBuilder()
     navigation_keyboard.add(
-        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
         InlineKeyboardButton(text="◀️ Назад", callback_data="connect_yandex_calendar"),
         InlineKeyboardButton(text="❌ Отменить", callback_data="calendar_setup_cancel")
     )
@@ -1316,7 +1316,7 @@ async def calendar_setup_edit_password(callback: CallbackQuery, state: FSMContex
     
     navigation_keyboard = InlineKeyboardBuilder()
     navigation_keyboard.add(
-        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://teletype.in/@your_bot/calendar_setup"),
+        InlineKeyboardButton(text="📘 Подробная инструкция", url="https://ya.ru"),
         InlineKeyboardButton(text="◀️ Изменить email", callback_data="calendar_setup_edit_email"),
         InlineKeyboardButton(text="❌ Отменить", callback_data="calendar_setup_cancel")
     )
